@@ -108,20 +108,22 @@ contract PersonaFragments is HoldingRewardsBase {
 
         if (isBuy) {
             require(msg.value >= price + protocolFee + personaFee, "Insufficient payment");
-            balance[persona][msg.sender] += amount;
-            supply[persona] += amount;
             protocolFeeRecipient.sendValue(protocolFee);
             payable(persona).sendValue(personaFee);
             if (msg.value > price + protocolFee + personaFee) {
                 payable(msg.sender).sendValue(msg.value - price - protocolFee - personaFee);
             }
+
+            balance[persona][msg.sender] += amount;
+            supply[persona] += amount;
         } else {
             require(balance[persona][msg.sender] >= amount, "Insufficient balance");
-            balance[persona][msg.sender] -= amount;
-            supply[persona] -= amount;
             payable(msg.sender).sendValue(price - protocolFee - personaFee);
             protocolFeeRecipient.sendValue(protocolFee);
             payable(persona).sendValue(personaFee);
+            
+            balance[persona][msg.sender] -= amount;
+            supply[persona] -= amount;
         }
 
         emit TradeExecuted(
