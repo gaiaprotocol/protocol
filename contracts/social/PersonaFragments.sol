@@ -87,6 +87,11 @@ contract PersonaFragments is HoldingRewardsBase {
         return price - protocolFee - personaFee;
     }
 
+    function _sendPersonaFee(address persona, uint256 amount) private {
+        (bool success, ) = payable(persona).call{value: amount}("");
+        if (!success) protocolFeeRecipient.sendValue(amount);
+    }
+
     function executeTrade(
         address persona,
         uint256 amount,
@@ -108,20 +113,22 @@ contract PersonaFragments is HoldingRewardsBase {
 
         if (isBuy) {
             require(msg.value >= price + protocolFee + personaFee, "Insufficient payment");
-            balance[persona][msg.sender] += amount;
-            supply[persona] += amount;
             protocolFeeRecipient.sendValue(protocolFee);
-            payable(persona).sendValue(personaFee);
+            _sendPersonaFee(persona, personaFee);
             if (msg.value > price + protocolFee + personaFee) {
                 payable(msg.sender).sendValue(msg.value - price - protocolFee - personaFee);
             }
+
+            balance[persona][msg.sender] += amount;
+            supply[persona] += amount;
         } else {
             require(balance[persona][msg.sender] >= amount, "Insufficient balance");
-            balance[persona][msg.sender] -= amount;
-            supply[persona] -= amount;
             payable(msg.sender).sendValue(price - protocolFee - personaFee);
             protocolFeeRecipient.sendValue(protocolFee);
-            payable(persona).sendValue(personaFee);
+            _sendPersonaFee(persona, personaFee);
+
+            balance[persona][msg.sender] -= amount;
+            supply[persona] -= amount;
         }
 
         emit TradeExecuted(
