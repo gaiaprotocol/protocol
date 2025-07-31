@@ -11,9 +11,6 @@ contract PersonaFragments is HoldingRewardsBase {
     // ------------------------------------------------------------------
     // Custom Errors (gas‑efficient reverts)
     // ------------------------------------------------------------------
-    error InvalidProtocolFeeRecipient();
-    error InvalidVerifierAddress();
-    error FeeRateExceedsMaximum();
     error InsufficientPayment();
     error InsufficientBalance();
 

@@ -11,9 +11,6 @@ contract ClanEmblems is HoldingRewardsBase {
     // ------------------------------------------------------------------
     // Custom Errors (gas‑efficient reverts)
     // ------------------------------------------------------------------
-    error InvalidProtocolFeeRecipient();
-    error InvalidVerifierAddress();
-    error FeeRateExceedsMaximum();
     error MustBuyAtLeastOneEmblem();
     error ClanDoesNotExist();
     error NotClanOwner();
