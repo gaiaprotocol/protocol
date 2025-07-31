@@ -11,9 +11,9 @@ library PricingLib {
         uint256 startPrice = priceIncrement + (supply * priceIncrement) / scaleFactor;
         uint256 endSupply = supply + amount;
         uint256 endPrice = priceIncrement + (endSupply * priceIncrement) / scaleFactor;
+
         uint256 averagePrice = (startPrice + endPrice) / 2;
-        uint256 totalCost = (averagePrice * amount) / scaleFactor;
-        return totalCost;
+        return (averagePrice * amount) / scaleFactor;
     }
 
     function getBuyPrice(
