@@ -1,7 +1,0 @@
-topics
-  topic - text - pk
-  logo_image_url - text - nullable
-  logo_thumbnail_url - text - nullable
-  description - text - nullable
-	created_at - timestampz - now()
-	updated_at - timestampz - nullable
