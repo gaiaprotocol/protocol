@@ -1,20 +1,35 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 
-import "@openzeppelin/contracts/utils/Address.sol";
-import "./HoldingRewardsBase.sol";
-import "../libraries/PricingLib.sol";
+import {Address} from "@openzeppelin/contracts/utils/Address.sol";
+import {HoldingRewardsBase} from "./HoldingRewardsBase.sol";
+import {PricingLib} from "../libraries/PricingLib.sol";
 
 contract TopicShares is HoldingRewardsBase {
     using Address for address payable;
 
+    // ------------------------------------------------------------------
+    // Constants & Config
+    // ------------------------------------------------------------------
     uint256 private constant ACC_FEE_PRECISION = 1e4;
-    uint256 public priceIncrementPerShare;
-    uint256 public holderFeeRate;
+    uint256 public priceIncrementPerShare; // Linear increment (wei) per share
+    uint256 public holderFeeRate; // 1 ether == 100%
 
+    // ------------------------------------------------------------------
+    // Custom Errors (gas‑efficient reverts)
+    // ------------------------------------------------------------------
+    error InvalidProtocolFeeRecipient();
+    error InvalidVerifierAddress();
+    error FeeRateExceedsMaximum();
+    error InsufficientPayment();
+    error InsufficientBalance();
+
+    // ------------------------------------------------------------------
+    // Data structures
+    // ------------------------------------------------------------------
     struct Topic {
         uint256 supply;
-        uint256 accFeePerUnit;
+        uint256 accFeePerUnit; // Accumulated fee per unit scaled by ACC_FEE_PRECISION
     }
 
     struct Holder {
@@ -25,6 +40,9 @@ contract TopicShares is HoldingRewardsBase {
     mapping(bytes32 => Topic) public topics;
     mapping(bytes32 => mapping(address => Holder)) public holders;
 
+    // ------------------------------------------------------------------
+    // Events
+    // ------------------------------------------------------------------
     event HolderFeeRateUpdated(uint256 rate);
     event TradeExecuted(
         address indexed trader,
@@ -39,6 +57,9 @@ contract TopicShares is HoldingRewardsBase {
     );
     event HolderFeeClaimed(address indexed holder, bytes32 indexed topic, uint256 fee);
 
+    // ------------------------------------------------------------------
+    // Initializer
+    // ------------------------------------------------------------------
     function initialize(
         address payable _protocolFeeRecipient,
         uint256 _protocolFeeRate,
@@ -50,8 +71,8 @@ contract TopicShares is HoldingRewardsBase {
         __ReentrancyGuard_init();
         __UUPSUpgradeable_init();
 
-        require(_protocolFeeRecipient != address(0), "Invalid protocol fee recipient");
-        require(_holdingVerifier != address(0), "Invalid verifier address");
+        if (_protocolFeeRecipient == address(0)) revert InvalidProtocolFeeRecipient();
+        if (_holdingVerifier == address(0)) revert InvalidVerifierAddress();
 
         protocolFeeRecipient = _protocolFeeRecipient;
         protocolFeeRate = _protocolFeeRate;
@@ -65,14 +86,23 @@ contract TopicShares is HoldingRewardsBase {
         emit HoldingVerifierUpdated(_holdingVerifier);
     }
 
-    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+    /// @dev Authorizes implementation upgrades (owner-only).
+    function _authorizeUpgrade(address /*newImplementation*/) internal override onlyOwner {
+        // No extra logic — access control enforced by `onlyOwner`.
+    }
 
+    // ------------------------------------------------------------------
+    // Admin setters
+    // ------------------------------------------------------------------
     function setHolderFeeRate(uint256 _rate) external onlyOwner {
-        require(_rate <= 1 ether, "Fee rate exceeds maximum");
+        if (_rate > 1 ether) revert FeeRateExceedsMaximum();
         holderFeeRate = _rate;
         emit HolderFeeRateUpdated(_rate);
     }
 
+    // ------------------------------------------------------------------
+    // Pricing helpers
+    // ------------------------------------------------------------------
     function getPrice(uint256 _supply, uint256 amount) public view returns (uint256) {
         return PricingLib.getPrice(_supply, amount, priceIncrementPerShare, 1);
     }
@@ -87,18 +117,21 @@ contract TopicShares is HoldingRewardsBase {
 
     function getBuyPriceAfterFee(bytes32 topic, uint256 amount) external view returns (uint256) {
         uint256 price = getBuyPrice(topic, amount);
-        uint256 protocolFee = ((price * protocolFeeRate) / 1 ether);
-        uint256 holderFee = ((price * holderFeeRate) / 1 ether);
+        uint256 protocolFee = (price * protocolFeeRate) / 1 ether;
+        uint256 holderFee = (price * holderFeeRate) / 1 ether;
         return price + protocolFee + holderFee;
     }
 
     function getSellPriceAfterFee(bytes32 topic, uint256 amount) external view returns (uint256) {
         uint256 price = getSellPrice(topic, amount);
-        uint256 protocolFee = ((price * protocolFeeRate) / 1 ether);
-        uint256 holderFee = ((price * holderFeeRate) / 1 ether);
+        uint256 protocolFee = (price * protocolFeeRate) / 1 ether;
+        uint256 holderFee = (price * holderFeeRate) / 1 ether;
         return price - protocolFee - holderFee;
     }
 
+    // ------------------------------------------------------------------
+    // Trading logic – BUY
+    // ------------------------------------------------------------------
     function buy(
         bytes32 topic,
         uint256 amount,
@@ -119,7 +152,8 @@ contract TopicShares is HoldingRewardsBase {
         uint256 protocolFee = rawProtocolFee - holdingReward;
         uint256 holderFee = ((price * holderFeeRate) / 1 ether) + holdingReward;
 
-        require(msg.value >= price + protocolFee + holderFee, "Insufficient payment");
+        uint256 totalCost = price + protocolFee + holderFee;
+        if (msg.value < totalCost) revert InsufficientPayment();
 
         if (t.supply > 0) {
             t.accFeePerUnit += (holderFee * ACC_FEE_PRECISION) / t.supply;
@@ -133,13 +167,14 @@ contract TopicShares is HoldingRewardsBase {
         h.feeDebt += int256((amount * t.accFeePerUnit) / ACC_FEE_PRECISION);
 
         protocolFeeRecipient.sendValue(protocolFee);
-        if (msg.value > price + protocolFee + holderFee) {
-            payable(msg.sender).sendValue(msg.value - price - protocolFee - holderFee);
-        }
+        if (msg.value > totalCost) payable(msg.sender).sendValue(msg.value - totalCost);
 
         emit TradeExecuted(msg.sender, topic, true, amount, price, protocolFee, holderFee, holdingReward, t.supply);
     }
 
+    // ------------------------------------------------------------------
+    // Trading logic – SELL
+    // ------------------------------------------------------------------
     function sell(
         bytes32 topic,
         uint256 amount,
@@ -150,7 +185,7 @@ contract TopicShares is HoldingRewardsBase {
         Topic memory t = topics[topic];
         Holder storage holder = holders[topic][msg.sender];
 
-        require(holder.balance >= amount, "Insufficient balance");
+        if (holder.balance < amount) revert InsufficientBalance();
 
         uint256 price = getSellPrice(topic, amount);
 
@@ -171,12 +206,10 @@ contract TopicShares is HoldingRewardsBase {
         if (t.supply > 0) {
             t.accFeePerUnit += (holderFee * ACC_FEE_PRECISION) / t.supply;
             topics[topic] = t;
-
             payable(msg.sender).sendValue(price - protocolFee - holderFee);
             protocolFeeRecipient.sendValue(protocolFee);
         } else {
             topics[topic] = t;
-
             payable(msg.sender).sendValue(price - protocolFee - holderFee);
             protocolFeeRecipient.sendValue(protocolFee + holderFee);
         }
@@ -184,6 +217,9 @@ contract TopicShares is HoldingRewardsBase {
         emit TradeExecuted(msg.sender, topic, false, amount, price, protocolFee, holderFee, holdingReward, t.supply);
     }
 
+    // ------------------------------------------------------------------
+    // Holder fee claims
+    // ------------------------------------------------------------------
     function claimableHolderFee(bytes32 topic, address holder) public view returns (uint256 claimableFee) {
         Topic memory t = topics[topic];
         Holder memory h = holders[topic][holder];
@@ -209,14 +245,16 @@ contract TopicShares is HoldingRewardsBase {
         bytes32[] memory _topics,
         address holder
     ) external view returns (uint256[] memory claimableFees) {
-        claimableFees = new uint256[](_topics.length);
-        for (uint256 i = 0; i < _topics.length; i++) {
+        uint256 len = _topics.length;
+        claimableFees = new uint256[](len);
+        for (uint256 i = 0; i < len; ++i) {
             claimableFees[i] = claimableHolderFee(_topics[i], holder);
         }
     }
 
     function batchClaimHolderFees(bytes32[] memory _topics) external nonReentrant {
-        for (uint256 i = 0; i < _topics.length; i++) {
+        uint256 len = _topics.length;
+        for (uint256 i = 0; i < len; ++i) {
             _claimHolderFee(_topics[i]);
         }
     }
