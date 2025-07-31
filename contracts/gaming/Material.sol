@@ -1,29 +1,51 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 
-import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
-import "@openzeppelin/contracts/access/Ownable2Step.sol";
+import {ERC20Permit, ERC20} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
+import {Ownable2Step, Ownable} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 
 contract Material is ERC20Permit, Ownable2Step {
-    address public immutable factory;
+    // ---------------------------------------------------------------------
+    // Custom Errors (gas‑efficient replacements for require statements)
+    // ---------------------------------------------------------------------
+    error CallerNotFactory();
+    error AlreadyWhitelisted();
+    error NotWhitelisted();
 
+    // ---------------------------------------------------------------------
+    // Immutable state
+    // ---------------------------------------------------------------------
+    address public immutable FACTORY;
+
+    // ---------------------------------------------------------------------
+    // Token metadata (mutable to allow post‑deployment branding)
+    // ---------------------------------------------------------------------
     string private _name;
     string private _symbol;
 
+    // ---------------------------------------------------------------------
+    // Whitelist mapping
+    // ---------------------------------------------------------------------
     mapping(address => bool) public whitelist;
 
+    // ---------------------------------------------------------------------
+    // Events
+    // ---------------------------------------------------------------------
     event NameUpdated(string name);
     event SymbolUpdated(string symbol);
     event WhitelistAdded(address indexed account);
     event WhitelistRemoved(address indexed account);
     event Deleted();
 
+    // ---------------------------------------------------------------------
+    // Constructor
+    // ---------------------------------------------------------------------
     constructor(
         address owner_,
         string memory name_,
         string memory symbol_
     ) ERC20Permit("Material") ERC20("", "") Ownable(owner_) {
-        factory = msg.sender;
+        FACTORY = msg.sender;
         _name = name_;
         _symbol = symbol_;
 
@@ -31,6 +53,9 @@ contract Material is ERC20Permit, Ownable2Step {
         emit SymbolUpdated(symbol_);
     }
 
+    // ---------------------------------------------------------------------
+    // Metadata getters
+    // ---------------------------------------------------------------------
     function name() public view virtual override returns (string memory) {
         return _name;
     }
@@ -39,6 +64,9 @@ contract Material is ERC20Permit, Ownable2Step {
         return _symbol;
     }
 
+    // ---------------------------------------------------------------------
+    // Metadata setters
+    // ---------------------------------------------------------------------
     function updateName(string memory name_) external onlyOwner {
         _name = name_;
         emit NameUpdated(name_);
@@ -49,11 +77,17 @@ contract Material is ERC20Permit, Ownable2Step {
         emit SymbolUpdated(symbol_);
     }
 
+    // ---------------------------------------------------------------------
+    // Access control
+    // ---------------------------------------------------------------------
     modifier onlyFactory() {
-        require(msg.sender == factory, "Material: caller is not the factory");
+        if (msg.sender != FACTORY) revert CallerNotFactory();
         _;
     }
 
+    // ---------------------------------------------------------------------
+    // Mint / Burn controlled by factory
+    // ---------------------------------------------------------------------
     function mint(address to, uint256 amount) external onlyFactory {
         _mint(to, amount);
     }
@@ -62,6 +96,9 @@ contract Material is ERC20Permit, Ownable2Step {
         _burn(from, amount);
     }
 
+    // ---------------------------------------------------------------------
+    // "Delete" token (irreversible)
+    // ---------------------------------------------------------------------
     function deleteMaterial() external onlyFactory {
         _name = "";
         _symbol = "";
@@ -69,19 +106,26 @@ contract Material is ERC20Permit, Ownable2Step {
         emit Deleted();
     }
 
+    // ---------------------------------------------------------------------
+    // Whitelist management
+    // ---------------------------------------------------------------------
     function addToWhitelist(address[] calldata _addresses) external onlyOwner {
-        for (uint256 i = 0; i < _addresses.length; i++) {
-            require(!whitelist[_addresses[i]], "Address is already whitelisted");
-            whitelist[_addresses[i]] = true;
-            emit WhitelistAdded(_addresses[i]);
+        uint256 len = _addresses.length;
+        for (uint256 i = 0; i < len; ++i) {
+            address addr = _addresses[i];
+            if (whitelist[addr]) revert AlreadyWhitelisted();
+            whitelist[addr] = true;
+            emit WhitelistAdded(addr);
         }
     }
 
     function removeFromWhitelist(address[] calldata _addresses) external onlyOwner {
-        for (uint256 i = 0; i < _addresses.length; i++) {
-            require(whitelist[_addresses[i]], "Address is not whitelisted");
-            whitelist[_addresses[i]] = false;
-            emit WhitelistRemoved(_addresses[i]);
+        uint256 len = _addresses.length;
+        for (uint256 i = 0; i < len; ++i) {
+            address addr = _addresses[i];
+            if (!whitelist[addr]) revert NotWhitelisted();
+            whitelist[addr] = false;
+            emit WhitelistRemoved(addr);
         }
     }
 
@@ -89,6 +133,9 @@ contract Material is ERC20Permit, Ownable2Step {
         return whitelist[_address];
     }
 
+    // ---------------------------------------------------------------------
+    // ERC20 override with whitelist bypass
+    // ---------------------------------------------------------------------
     function transferFrom(address sender, address recipient, uint256 amount) public virtual override returns (bool) {
         if (whitelist[msg.sender]) {
             _transfer(sender, recipient, amount);
