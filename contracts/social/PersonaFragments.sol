@@ -1,19 +1,34 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 
-import "@openzeppelin/contracts/utils/Address.sol";
-import "./HoldingRewardsBase.sol";
-import "../libraries/PricingLib.sol";
+import {Address} from "@openzeppelin/contracts/utils/Address.sol";
+import {HoldingRewardsBase} from "./HoldingRewardsBase.sol";
+import {PricingLib} from "../libraries/PricingLib.sol";
 
 contract PersonaFragments is HoldingRewardsBase {
     using Address for address payable;
 
-    uint256 public priceIncrementPerFragment;
-    uint256 public personaOwnerFeeRate;
+    // ------------------------------------------------------------------
+    // Custom Errors (gas‑efficient reverts)
+    // ------------------------------------------------------------------
+    error InvalidProtocolFeeRecipient();
+    error InvalidVerifierAddress();
+    error FeeRateExceedsMaximum();
+    error InsufficientPayment();
+    error InsufficientBalance();
 
-    mapping(address => mapping(address => uint256)) public balance;
-    mapping(address => uint256) public supply;
+    // ------------------------------------------------------------------
+    // Config
+    // ------------------------------------------------------------------
+    uint256 public priceIncrementPerFragment; // Linear increment (wei) per fragment
+    uint256 public personaOwnerFeeRate; // 1 ether == 100%
 
+    mapping(address => mapping(address => uint256)) public balance; // persona → user → amount
+    mapping(address => uint256) public supply; // persona → total supply
+
+    // ------------------------------------------------------------------
+    // Events
+    // ------------------------------------------------------------------
     event PersonaOwnerFeeRateUpdated(uint256 rate);
     event TradeExecuted(
         address indexed trader,
@@ -27,6 +42,9 @@ contract PersonaFragments is HoldingRewardsBase {
         uint256 supply
     );
 
+    // ------------------------------------------------------------------
+    // Initializer
+    // ------------------------------------------------------------------
     function initialize(
         address payable _protocolFeeRecipient,
         uint256 _protocolFeeRate,
@@ -38,8 +56,8 @@ contract PersonaFragments is HoldingRewardsBase {
         __ReentrancyGuard_init();
         __UUPSUpgradeable_init();
 
-        require(_protocolFeeRecipient != address(0), "Invalid protocol fee recipient");
-        require(_holdingVerifier != address(0), "Invalid verifier address");
+        if (_protocolFeeRecipient == address(0)) revert InvalidProtocolFeeRecipient();
+        if (_holdingVerifier == address(0)) revert InvalidVerifierAddress();
 
         protocolFeeRecipient = _protocolFeeRecipient;
         protocolFeeRate = _protocolFeeRate;
@@ -53,14 +71,23 @@ contract PersonaFragments is HoldingRewardsBase {
         emit HoldingVerifierUpdated(_holdingVerifier);
     }
 
-    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+    /// @dev Authorizes implementation upgrades (owner-only).
+    function _authorizeUpgrade(address /*newImplementation*/) internal override onlyOwner {
+        // No extra logic — access control enforced by `onlyOwner`.
+    }
 
+    // ------------------------------------------------------------------
+    // Admin setters
+    // ------------------------------------------------------------------
     function setPersonaOwnerFeeRate(uint256 _rate) external onlyOwner {
-        require(_rate <= 1 ether, "Fee rate exceeds maximum");
+        if (_rate > 1 ether) revert FeeRateExceedsMaximum();
         personaOwnerFeeRate = _rate;
         emit PersonaOwnerFeeRateUpdated(_rate);
     }
 
+    // ------------------------------------------------------------------
+    // Pricing helpers
+    // ------------------------------------------------------------------
     function getPrice(uint256 _supply, uint256 amount) public view returns (uint256) {
         return PricingLib.getPrice(_supply, amount, priceIncrementPerFragment, 1);
     }
@@ -87,63 +114,72 @@ contract PersonaFragments is HoldingRewardsBase {
         return price - protocolFee - personaFee;
     }
 
+    // ------------------------------------------------------------------
+    // Internal helpers
+    // ------------------------------------------------------------------
     function _sendPersonaFee(address persona, uint256 amount) private {
         (bool success, ) = payable(persona).call{value: amount}("");
         if (!success) protocolFeeRecipient.sendValue(amount);
     }
 
-    function executeTrade(
-        address persona,
-        uint256 amount,
-        uint256 price,
-        bool isBuy,
-        uint256 rewardRatio,
-        uint256 holdingRewardNonce,
-        bytes memory holdingRewardSignature
-    ) private nonReentrant {
-        uint256 rawProtocolFee = (price * protocolFeeRate) / 1 ether;
+    struct TradeParams {
+        address persona;
+        uint256 amount;
+        uint256 price;
+        bool isBuy;
+        uint256 rewardRatio;
+        uint256 holdingRewardNonce;
+        bytes holdingRewardSignature;
+    }
+
+    function executeTrade(TradeParams memory p) private nonReentrant {
+        uint256 rawProtocolFee = (p.price * protocolFeeRate) / 1 ether;
         uint256 holdingReward = calculateHoldingReward(
             rawProtocolFee,
-            rewardRatio,
-            holdingRewardNonce,
-            holdingRewardSignature
+            p.rewardRatio,
+            p.holdingRewardNonce,
+            p.holdingRewardSignature
         );
         uint256 protocolFee = rawProtocolFee - holdingReward;
-        uint256 personaFee = ((price * personaOwnerFeeRate) / 1 ether) + holdingReward;
+        uint256 personaFee = ((p.price * personaOwnerFeeRate) / 1 ether) + holdingReward;
 
-        if (isBuy) {
-            require(msg.value >= price + protocolFee + personaFee, "Insufficient payment");
+        if (p.isBuy) {
+            uint256 totalCost = p.price + protocolFee + personaFee;
+            if (msg.value < totalCost) revert InsufficientPayment();
+
             protocolFeeRecipient.sendValue(protocolFee);
-            _sendPersonaFee(persona, personaFee);
-            if (msg.value > price + protocolFee + personaFee) {
-                payable(msg.sender).sendValue(msg.value - price - protocolFee - personaFee);
-            }
+            _sendPersonaFee(p.persona, personaFee);
+            if (msg.value > totalCost) payable(msg.sender).sendValue(msg.value - totalCost);
 
-            balance[persona][msg.sender] += amount;
-            supply[persona] += amount;
+            balance[p.persona][msg.sender] += p.amount;
+            supply[p.persona] += p.amount;
         } else {
-            require(balance[persona][msg.sender] >= amount, "Insufficient balance");
-            payable(msg.sender).sendValue(price - protocolFee - personaFee);
-            protocolFeeRecipient.sendValue(protocolFee);
-            _sendPersonaFee(persona, personaFee);
+            if (balance[p.persona][msg.sender] < p.amount) revert InsufficientBalance();
 
-            balance[persona][msg.sender] -= amount;
-            supply[persona] -= amount;
+            payable(msg.sender).sendValue(p.price - protocolFee - personaFee);
+            protocolFeeRecipient.sendValue(protocolFee);
+            _sendPersonaFee(p.persona, personaFee);
+
+            balance[p.persona][msg.sender] -= p.amount;
+            supply[p.persona] -= p.amount;
         }
 
         emit TradeExecuted(
             msg.sender,
-            persona,
-            isBuy,
-            amount,
-            price,
+            p.persona,
+            p.isBuy,
+            p.amount,
+            p.price,
             protocolFee,
             personaFee,
             holdingReward,
-            supply[persona]
+            supply[p.persona]
         );
     }
 
+    // ------------------------------------------------------------------
+    // External trading API
+    // ------------------------------------------------------------------
     function buy(
         address persona,
         uint256 amount,
@@ -152,7 +188,17 @@ contract PersonaFragments is HoldingRewardsBase {
         bytes memory holdingRewardSignature
     ) external payable {
         uint256 price = getBuyPrice(persona, amount);
-        executeTrade(persona, amount, price, true, rewardRatio, holdingRewardNonce, holdingRewardSignature);
+        executeTrade(
+            TradeParams({
+                persona: persona,
+                amount: amount,
+                price: price,
+                isBuy: true,
+                rewardRatio: rewardRatio,
+                holdingRewardNonce: holdingRewardNonce,
+                holdingRewardSignature: holdingRewardSignature
+            })
+        );
     }
 
     function sell(
@@ -163,6 +209,16 @@ contract PersonaFragments is HoldingRewardsBase {
         bytes memory holdingRewardSignature
     ) external {
         uint256 price = getSellPrice(persona, amount);
-        executeTrade(persona, amount, price, false, rewardRatio, holdingRewardNonce, holdingRewardSignature);
+        executeTrade(
+            TradeParams({
+                persona: persona,
+                amount: amount,
+                price: price,
+                isBuy: false,
+                rewardRatio: rewardRatio,
+                holdingRewardNonce: holdingRewardNonce,
+                holdingRewardSignature: holdingRewardSignature
+            })
+        );
     }
 }
