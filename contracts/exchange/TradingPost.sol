@@ -93,7 +93,10 @@ contract TradingPost is
         emit ProtocolFeeRateUpdated(_protocolFeeRate);
     }
 
-    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+    /// @dev Authorizes implementation upgrades (owner-only).
+    function _authorizeUpgrade(address /*newImplementation*/) internal override onlyOwner {
+        // No extra logic — access control enforced by `onlyOwner`.
+    }
 
     // ---------------------------------------------------------------------
     // Admin setters
