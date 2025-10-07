@@ -20,6 +20,7 @@ contract ClanEmblems is HoldingRewardsBase {
     error InsufficientPayment();
     error InsufficientBalance();
     error OwnerCannotSellAllEmblems();
+    error ZeroAmount();
 
     // ------------------------------------------------------------------
     // Config
@@ -230,6 +231,7 @@ contract ClanEmblems is HoldingRewardsBase {
     }
 
     function executeTrade(TradeParams memory p) private nonReentrant {
+        if (p.amount == 0) revert ZeroAmount();
         if (clans[p.clanId].owner == address(0)) revert ClanDoesNotExist();
 
         uint256 rawProtocolFee = (p.price * protocolFeeRate) / 1 ether;
