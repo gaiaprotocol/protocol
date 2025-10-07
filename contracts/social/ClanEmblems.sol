@@ -42,6 +42,8 @@ contract ClanEmblems is HoldingRewardsBase {
     mapping(address => uint256[]) public userClans;
     mapping(address => mapping(uint256 => uint256)) public userClanIndex;
 
+    uint256 private bypassOwnerFullSellGuard;
+
     // ------------------------------------------------------------------
     // Events
     // ------------------------------------------------------------------
@@ -90,6 +92,8 @@ contract ClanEmblems is HoldingRewardsBase {
         emit ProtocolFeeRateUpdated(_protocolFeeRate);
         emit ClanFeeRateUpdated(_clanFeeRate);
         emit HoldingVerifierUpdated(_holdingVerifier);
+
+        bypassOwnerFullSellGuard = 1;
     }
 
     /// @dev Authorizes implementation upgrades (owner-only).
@@ -170,6 +174,7 @@ contract ClanEmblems is HoldingRewardsBase {
         if (balance[clanId][msg.sender] != _supply) revert OwnerMustHoldEntireSupply();
 
         uint256 price = getSellPrice(clanId, _supply);
+        bypassOwnerFullSellGuard = 2; // Bypass full‑sell guard for this internal call
         executeTrade(
             TradeParams({
                 clanId: clanId,
@@ -181,6 +186,7 @@ contract ClanEmblems is HoldingRewardsBase {
                 holdingRewardSignature: holdingRewardSignature
             })
         );
+        bypassOwnerFullSellGuard = 1;
 
         withdrawFees(clanId);
 
@@ -261,8 +267,11 @@ contract ClanEmblems is HoldingRewardsBase {
             if (balance[p.clanId][msg.sender] < p.amount) revert InsufficientBalance();
 
             // Prevent owner from dumping entire supply except via deleteClan
-            if (msg.sender == clans[p.clanId].owner && balance[p.clanId][msg.sender] == p.amount)
-                revert OwnerCannotSellAllEmblems();
+            if (
+                msg.sender == clans[p.clanId].owner &&
+                balance[p.clanId][msg.sender] == p.amount &&
+                bypassOwnerFullSellGuard == 1
+            ) revert OwnerCannotSellAllEmblems();
 
             balance[p.clanId][msg.sender] -= p.amount;
             supply[p.clanId] -= p.amount;
