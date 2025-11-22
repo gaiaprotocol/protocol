@@ -24,6 +24,7 @@ contract MaterialFactory is OwnableUpgradeable, ReentrancyGuardUpgradeable, UUPS
     error SupplyNotZero();
     error InsufficientPayment();
     error InsufficientBalance();
+    error InvalidAmount();
 
     // ------------------------------------------------------------------
     // Configuration
@@ -38,6 +39,12 @@ contract MaterialFactory is OwnableUpgradeable, ReentrancyGuardUpgradeable, UUPS
     // ------------------------------------------------------------------
     mapping(address => bool) public isMaterial;
     mapping(address => bool) public tradingOpened;
+
+    // ------------------------------------------------------------------
+    // Storage Gap (Critical for Upgradeability)
+    // ------------------------------------------------------------------
+    // Reserved space to prevent storage collision during future upgrades
+    uint256[50] private __gap;
 
     // ------------------------------------------------------------------
     // Events
@@ -123,6 +130,8 @@ contract MaterialFactory is OwnableUpgradeable, ReentrancyGuardUpgradeable, UUPS
     // Material lifecycle
     // ------------------------------------------------------------------
     function createMaterial(string memory name, string memory symbol, bytes32 metadataHash) public returns (address) {
+        // NOTE: Ensure the Material constructor properly sets up permissions
+        // so this Factory contract can mint/burn if needed.
         Material newMaterial = new Material(msg.sender, name, symbol);
         isMaterial[address(newMaterial)] = true;
         emit MaterialCreated(msg.sender, address(newMaterial), name, symbol, metadataHash);
@@ -199,6 +208,8 @@ contract MaterialFactory is OwnableUpgradeable, ReentrancyGuardUpgradeable, UUPS
         bool isBuy
     ) private onlyMaterial(materialAddress) nonReentrant {
         Material material = Material(materialAddress);
+
+        // Check if trading is allowed (either owner is trading, or trading is opened)
         if (!(material.owner() == msg.sender || tradingOpened[materialAddress])) revert TradingNotOpenedYet();
 
         uint256 protocolFee = (price * protocolFeeRate) / 1 ether;
@@ -206,19 +217,21 @@ contract MaterialFactory is OwnableUpgradeable, ReentrancyGuardUpgradeable, UUPS
 
         if (isBuy) {
             uint256 totalCost = price + protocolFee + materialOwnerFee;
+            // Slippage protection check
             if (msg.value < totalCost) revert InsufficientPayment();
 
             material.mint(msg.sender, amount);
             protocolFeeRecipient.sendValue(protocolFee);
             _sendMaterialOwnerFee(material.owner(), materialOwnerFee);
 
-            // Refund excess ETH (if any)
+            // Refund excess ETH
             if (msg.value > totalCost) payable(msg.sender).sendValue(msg.value - totalCost);
         } else {
             if (material.balanceOf(msg.sender) < amount) revert InsufficientBalance();
             material.burn(msg.sender, amount);
 
             uint256 netAmount = price - protocolFee - materialOwnerFee;
+
             payable(msg.sender).sendValue(netAmount);
             protocolFeeRecipient.sendValue(protocolFee);
             _sendMaterialOwnerFee(material.owner(), materialOwnerFee);
@@ -240,11 +253,15 @@ contract MaterialFactory is OwnableUpgradeable, ReentrancyGuardUpgradeable, UUPS
     // External trading API
     // ------------------------------------------------------------------
     function buy(address materialAddress, uint256 amount) external payable {
+        if (amount == 0) revert InvalidAmount();
+
         uint256 price = getBuyPrice(materialAddress, amount);
         executeTrade(materialAddress, amount, price, true);
     }
 
     function sell(address materialAddress, uint256 amount) external {
+        if (amount == 0) revert InvalidAmount();
+
         uint256 price = getSellPrice(materialAddress, amount);
         executeTrade(materialAddress, amount, price, false);
     }

@@ -3,8 +3,12 @@ pragma solidity ^0.8.30;
 
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
-import {ERC721HolderUpgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC721/utils/ERC721HolderUpgradeable.sol";
-import {ERC1155HolderUpgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC1155/utils/ERC1155HolderUpgradeable.sol";
+import {
+    ERC721HolderUpgradeable
+} from "@openzeppelin/contracts-upgradeable/token/ERC721/utils/ERC721HolderUpgradeable.sol";
+import {
+    ERC1155HolderUpgradeable
+} from "@openzeppelin/contracts-upgradeable/token/ERC1155/utils/ERC1155HolderUpgradeable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
@@ -61,6 +65,15 @@ contract TradingPost is
     uint256 public nextListingId;
     mapping(uint256 => Listing) public listings;
 
+    // ---------------------------------------------------------------------
+    // Storage Gap (Critical for Upgradeability)
+    // ---------------------------------------------------------------------
+    // Reserved space to prevent storage collision during future upgrades
+    uint256[50] private __gap;
+
+    // ---------------------------------------------------------------------
+    // Events
+    // ---------------------------------------------------------------------
     event ItemListed(
         uint256 indexed listingId,
         address indexed seller,
@@ -79,6 +92,10 @@ contract TradingPost is
     function initialize(address payable _protocolFeeRecipient, uint256 _protocolFeeRate) external initializer {
         __Ownable_init(msg.sender);
         __ReentrancyGuard_init();
+
+        // Initialize parent contracts explicitly
+        __ERC721Holder_init();
+        __ERC1155Holder_init();
         __UUPSUpgradeable_init();
 
         if (_protocolFeeRecipient == address(0)) revert InvalidProtocolFeeRecipient();
@@ -223,13 +240,9 @@ contract TradingPost is
     // ---------------------------------------------------------------------
     // ERC165 support
     // ---------------------------------------------------------------------
-    function supportsInterface(bytes4 interfaceId)
-        public
-        view
-        virtual
-        override(ERC1155HolderUpgradeable)
-        returns (bool)
-    {
+    function supportsInterface(
+        bytes4 interfaceId
+    ) public view virtual override(ERC1155HolderUpgradeable) returns (bool) {
         return super.supportsInterface(interfaceId);
     }
 }
