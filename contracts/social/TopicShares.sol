@@ -16,10 +16,11 @@ contract TopicShares is HoldingRewardsBase {
     uint256 public holderFeeRate; // 1 ether == 100%
 
     // ------------------------------------------------------------------
-    // Custom Errors (gas‑efficient reverts)
+    // Custom Errors (gas-efficient reverts)
     // ------------------------------------------------------------------
     error InsufficientPayment();
     error InsufficientBalance();
+    error InvalidAmount();
 
     // ------------------------------------------------------------------
     // Data structures
@@ -36,6 +37,12 @@ contract TopicShares is HoldingRewardsBase {
 
     mapping(bytes32 => Topic) public topics;
     mapping(bytes32 => mapping(address => Holder)) public holders;
+
+    // ------------------------------------------------------------------
+    // Storage Gap
+    // ------------------------------------------------------------------
+    // Reserved space for future upgrades
+    uint256[50] private __gap;
 
     // ------------------------------------------------------------------
     // Events
@@ -64,23 +71,15 @@ contract TopicShares is HoldingRewardsBase {
         uint256 _priceIncrementPerShare,
         address _holdingVerifier
     ) external initializer {
-        __Ownable_init(msg.sender);
-        __ReentrancyGuard_init();
-        __UUPSUpgradeable_init();
+        // Call parent initializer to set protocol fee params and verifier
+        __HoldingRewardsBase_init(_protocolFeeRecipient, _protocolFeeRate, _holdingVerifier);
 
-        if (_protocolFeeRecipient == address(0)) revert InvalidProtocolFeeRecipient();
-        if (_holdingVerifier == address(0)) revert InvalidVerifierAddress();
+        if (_holderFeeRate > 1 ether) revert FeeRateExceedsMaximum();
 
-        protocolFeeRecipient = _protocolFeeRecipient;
-        protocolFeeRate = _protocolFeeRate;
         holderFeeRate = _holderFeeRate;
         priceIncrementPerShare = _priceIncrementPerShare;
-        holdingVerifier = _holdingVerifier;
 
-        emit ProtocolFeeRecipientUpdated(_protocolFeeRecipient);
-        emit ProtocolFeeRateUpdated(_protocolFeeRate);
         emit HolderFeeRateUpdated(_holderFeeRate);
-        emit HoldingVerifierUpdated(_holdingVerifier);
     }
 
     /// @dev Authorizes implementation upgrades (owner-only).
@@ -136,16 +135,21 @@ contract TopicShares is HoldingRewardsBase {
         uint256 holdingRewardNonce,
         bytes memory holdingRewardSignature
     ) external payable nonReentrant {
+        if (amount == 0) revert InvalidAmount(); // Prevent zero trades
+
         Topic memory t = topics[topic];
         uint256 price = getBuyPrice(topic, amount);
 
         uint256 rawProtocolFee = (price * protocolFeeRate) / 1 ether;
+
+        // Updated: uses base contract logic that ignores price slippage in signature
         uint256 holdingReward = calculateHoldingReward(
             rawProtocolFee,
             rewardRatio,
             holdingRewardNonce,
             holdingRewardSignature
         );
+
         uint256 protocolFee = rawProtocolFee - holdingReward;
         uint256 holderFee = ((price * holderFeeRate) / 1 ether) + holdingReward;
 
@@ -179,6 +183,8 @@ contract TopicShares is HoldingRewardsBase {
         uint256 holdingRewardNonce,
         bytes memory holdingRewardSignature
     ) external nonReentrant {
+        if (amount == 0) revert InvalidAmount(); // Prevent zero trades
+
         Topic memory t = topics[topic];
         Holder storage holder = holders[topic][msg.sender];
 
@@ -187,12 +193,15 @@ contract TopicShares is HoldingRewardsBase {
         uint256 price = getSellPrice(topic, amount);
 
         uint256 rawProtocolFee = (price * protocolFeeRate) / 1 ether;
+
+        // Updated: uses base contract logic that ignores price slippage in signature
         uint256 holdingReward = calculateHoldingReward(
             rawProtocolFee,
             rewardRatio,
             holdingRewardNonce,
             holdingRewardSignature
         );
+
         uint256 protocolFee = rawProtocolFee - holdingReward;
         uint256 holderFee = ((price * holderFeeRate) / 1 ether) + holdingReward;
 
@@ -206,6 +215,7 @@ contract TopicShares is HoldingRewardsBase {
             payable(msg.sender).sendValue(price - protocolFee - holderFee);
             protocolFeeRecipient.sendValue(protocolFee);
         } else {
+            // Last seller case: No remaining holders, so fees go to protocol
             topics[topic] = t;
             payable(msg.sender).sendValue(price - protocolFee - holderFee);
             protocolFeeRecipient.sendValue(protocolFee + holderFee);

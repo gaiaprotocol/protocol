@@ -9,10 +9,11 @@ contract PersonaFragments is HoldingRewardsBase {
     using Address for address payable;
 
     // ------------------------------------------------------------------
-    // Custom Errors (gas‑efficient reverts)
+    // Custom Errors (gas-efficient reverts)
     // ------------------------------------------------------------------
     error InsufficientPayment();
     error InsufficientBalance();
+    error InvalidAmount();
 
     // ------------------------------------------------------------------
     // Config
@@ -22,6 +23,12 @@ contract PersonaFragments is HoldingRewardsBase {
 
     mapping(address => mapping(address => uint256)) public balance; // persona → user → amount
     mapping(address => uint256) public supply; // persona → total supply
+
+    // ------------------------------------------------------------------
+    // Storage Gap
+    // ------------------------------------------------------------------
+    // Reserved space for future upgrades of this specific contract
+    uint256[50] private __gap;
 
     // ------------------------------------------------------------------
     // Events
@@ -49,28 +56,20 @@ contract PersonaFragments is HoldingRewardsBase {
         uint256 _priceIncrementPerFragment,
         address _holdingVerifier
     ) external initializer {
-        __Ownable_init(msg.sender);
-        __ReentrancyGuard_init();
-        __UUPSUpgradeable_init();
+        // Call parent initializer (Logic encapsulation)
+        __HoldingRewardsBase_init(_protocolFeeRecipient, _protocolFeeRate, _holdingVerifier);
 
-        if (_protocolFeeRecipient == address(0)) revert InvalidProtocolFeeRecipient();
-        if (_holdingVerifier == address(0)) revert InvalidVerifierAddress();
+        if (_personaOwnerFeeRate > 1 ether) revert FeeRateExceedsMaximum();
 
-        protocolFeeRecipient = _protocolFeeRecipient;
-        protocolFeeRate = _protocolFeeRate;
         personaOwnerFeeRate = _personaOwnerFeeRate;
         priceIncrementPerFragment = _priceIncrementPerFragment;
-        holdingVerifier = _holdingVerifier;
 
-        emit ProtocolFeeRecipientUpdated(_protocolFeeRecipient);
-        emit ProtocolFeeRateUpdated(_protocolFeeRate);
         emit PersonaOwnerFeeRateUpdated(_personaOwnerFeeRate);
-        emit HoldingVerifierUpdated(_holdingVerifier);
     }
 
     /// @dev Authorizes implementation upgrades (owner-only).
     function _authorizeUpgrade(address /*newImplementation*/) internal override onlyOwner {
-        // No extra logic — access control enforced by `onlyOwner`.
+        // Access control enforced by onlyOwner
     }
 
     // ------------------------------------------------------------------
@@ -115,6 +114,8 @@ contract PersonaFragments is HoldingRewardsBase {
     // Internal helpers
     // ------------------------------------------------------------------
     function _sendPersonaFee(address persona, uint256 amount) private {
+        // If the persona owner is a contract that cannot receive ETH,
+        // send the fee to the protocol recipient instead to prevent DoS.
         (bool success, ) = payable(persona).call{value: amount}("");
         if (!success) protocolFeeRecipient.sendValue(amount);
     }
@@ -130,30 +131,46 @@ contract PersonaFragments is HoldingRewardsBase {
     }
 
     function executeTrade(TradeParams memory p) private nonReentrant {
+        // 1. Calculate raw protocol fee
         uint256 rawProtocolFee = (p.price * protocolFeeRate) / 1 ether;
+
+        // 2. Calculate holding reward
+        // Note: calculateHoldingReward no longer uses rawProtocolFee for signature verification,
+        // only checks rewardRatio. This makes it safe against price slippage.
         uint256 holdingReward = calculateHoldingReward(
             rawProtocolFee,
             p.rewardRatio,
             p.holdingRewardNonce,
             p.holdingRewardSignature
         );
+
+        // 3. Calculate final fee distribution
+        // The holding reward is deducted from the protocol fee and effectively transferred to the user/persona fee logic
         uint256 protocolFee = rawProtocolFee - holdingReward;
         uint256 personaFee = ((p.price * personaOwnerFeeRate) / 1 ether) + holdingReward;
 
         if (p.isBuy) {
             uint256 totalCost = p.price + protocolFee + personaFee;
+
+            // Check >= to allow for extra ETH sent for slippage/gas
             if (msg.value < totalCost) revert InsufficientPayment();
 
             protocolFeeRecipient.sendValue(protocolFee);
             _sendPersonaFee(p.persona, personaFee);
-            if (msg.value > totalCost) payable(msg.sender).sendValue(msg.value - totalCost);
+
+            // Refund excess ETH
+            if (msg.value > totalCost) {
+                payable(msg.sender).sendValue(msg.value - totalCost);
+            }
 
             balance[p.persona][msg.sender] += p.amount;
             supply[p.persona] += p.amount;
         } else {
             if (balance[p.persona][msg.sender] < p.amount) revert InsufficientBalance();
 
-            payable(msg.sender).sendValue(p.price - protocolFee - personaFee);
+            uint256 proceeds = p.price - protocolFee - personaFee;
+
+            payable(msg.sender).sendValue(proceeds);
             protocolFeeRecipient.sendValue(protocolFee);
             _sendPersonaFee(p.persona, personaFee);
 
@@ -184,6 +201,8 @@ contract PersonaFragments is HoldingRewardsBase {
         uint256 holdingRewardNonce,
         bytes memory holdingRewardSignature
     ) external payable {
+        if (amount == 0) revert InvalidAmount();
+
         uint256 price = getBuyPrice(persona, amount);
         executeTrade(
             TradeParams({
@@ -205,6 +224,8 @@ contract PersonaFragments is HoldingRewardsBase {
         uint256 holdingRewardNonce,
         bytes memory holdingRewardSignature
     ) external {
+        if (amount == 0) revert InvalidAmount();
+
         uint256 price = getSellPrice(persona, amount);
         executeTrade(
             TradeParams({

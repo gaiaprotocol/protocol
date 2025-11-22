@@ -9,7 +9,7 @@ contract ClanEmblems is HoldingRewardsBase {
     using Address for address payable;
 
     // ------------------------------------------------------------------
-    // Custom Errors (gas‑efficient reverts)
+    // Custom Errors (gas-efficient reverts)
     // ------------------------------------------------------------------
     error MustBuyAtLeastOneEmblem();
     error ClanDoesNotExist();
@@ -38,11 +38,17 @@ contract ClanEmblems is HoldingRewardsBase {
     mapping(uint256 => mapping(address => uint256)) public balance;
     mapping(uint256 => uint256) public supply;
 
-    // Per‑user clan tracking (for `sharesAnyClan` helper)
+    // Per-user clan tracking (for `sharesAnyClan` helper)
     mapping(address => uint256[]) public userClans;
     mapping(address => mapping(uint256 => uint256)) public userClanIndex;
 
     uint256 private bypassOwnerFullSellGuard;
+
+    // ------------------------------------------------------------------
+    // Storage Gap
+    // ------------------------------------------------------------------
+    // Reserved space for future upgrades
+    uint256[50] private __gap;
 
     // ------------------------------------------------------------------
     // Events
@@ -74,24 +80,15 @@ contract ClanEmblems is HoldingRewardsBase {
         uint256 _priceIncrementPerEmblem,
         address _holdingVerifier
     ) external initializer {
-        __Ownable_init(msg.sender);
-        __ReentrancyGuard_init();
-        __UUPSUpgradeable_init();
+        // Call parent initializer to set protocol fee params and verifier
+        __HoldingRewardsBase_init(_protocolFeeRecipient, _protocolFeeRate, _holdingVerifier);
 
-        if (_protocolFeeRecipient == address(0)) revert InvalidProtocolFeeRecipient();
-        if (_holdingVerifier == address(0)) revert InvalidVerifierAddress();
-        if (_clanFeeRate > 1 ether || _protocolFeeRate > 1 ether) revert FeeRateExceedsMaximum();
+        if (_clanFeeRate > 1 ether) revert FeeRateExceedsMaximum();
 
-        protocolFeeRecipient = _protocolFeeRecipient;
-        protocolFeeRate = _protocolFeeRate;
         clanFeeRate = _clanFeeRate;
         priceIncrementPerEmblem = _priceIncrementPerEmblem;
-        holdingVerifier = _holdingVerifier;
 
-        emit ProtocolFeeRecipientUpdated(_protocolFeeRecipient);
-        emit ProtocolFeeRateUpdated(_protocolFeeRate);
         emit ClanFeeRateUpdated(_clanFeeRate);
-        emit HoldingVerifierUpdated(_holdingVerifier);
 
         bypassOwnerFullSellGuard = 1;
     }
@@ -174,7 +171,10 @@ contract ClanEmblems is HoldingRewardsBase {
         if (balance[clanId][msg.sender] != _supply) revert OwnerMustHoldEntireSupply();
 
         uint256 price = getSellPrice(clanId, _supply);
-        bypassOwnerFullSellGuard = 2; // Bypass full‑sell guard for this internal call
+
+        // Temporarily bypass the guard that prevents the owner from selling everything
+        bypassOwnerFullSellGuard = 2;
+
         executeTrade(
             TradeParams({
                 clanId: clanId,
@@ -186,6 +186,7 @@ contract ClanEmblems is HoldingRewardsBase {
                 holdingRewardSignature: holdingRewardSignature
             })
         );
+
         bypassOwnerFullSellGuard = 1;
 
         withdrawFees(clanId);
@@ -237,16 +238,20 @@ contract ClanEmblems is HoldingRewardsBase {
     }
 
     function executeTrade(TradeParams memory p) private nonReentrant {
+        // Zero amount check
         if (p.amount == 0) revert ZeroAmount();
         if (clans[p.clanId].owner == address(0)) revert ClanDoesNotExist();
 
         uint256 rawProtocolFee = (p.price * protocolFeeRate) / 1 ether;
+
+        // Updated: baseAmount(rawProtocolFee) is used for calculation but ignored in signature hash
         uint256 holdingReward = calculateHoldingReward(
             rawProtocolFee,
             p.rewardRatio,
             p.holdingRewardNonce,
             p.holdingRewardSignature
         );
+
         uint256 protocolFee = rawProtocolFee - holdingReward;
         uint256 clanFee = ((p.price * clanFeeRate) / 1 ether) + holdingReward;
 
@@ -342,7 +347,7 @@ contract ClanEmblems is HoldingRewardsBase {
     }
 
     // ------------------------------------------------------------------
-    // Internal helpers for per‑user clan lists
+    // Internal helpers for per-user clan lists
     // ------------------------------------------------------------------
     function _addUserClan(address user, uint256 clanId) internal {
         userClanIndex[user][clanId] = userClans[user].length;
