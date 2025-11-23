@@ -40,4 +40,4 @@ yarn.lock
 ignition/deployments/chain-31337
 
 /.openzeppelin
-/full/full.sol
+/merged/*

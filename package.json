@@ -19,6 +19,7 @@
     "@types/mocha": ">=10.0.10",
     "@types/node": ">=24.1.0",
     "chai": "^5.2.1",
+    "dotenv": "^17.2.1",
     "ethers": "^6.15.0",
     "hardhat": "^2.26.1",
     "hardhat-gas-reporter": "^2.3.0",
@@ -26,8 +27,7 @@
     "solidity-coverage": "^0.8.16",
     "ts-node": ">=10.9.2",
     "typechain": "^8.3.2",
-    "typescript": ">=5.8.3",
-    "dotenv": "^17.2.1"
+    "typescript": ">=5.8.3"
   },
   "packageManager": "yarn@1.22.22"
 }
