@@ -1,6 +1,0 @@
-{
-  "type": "module",
-  "devDependencies": {
-    "sol-merger": "^4.4.2"
-  }
-}
