@@ -75,6 +75,15 @@ contract MaterialFactory is OwnableUpgradeable, ReentrancyGuardUpgradeable, UUPS
     );
 
     // ------------------------------------------------------------------
+    // Constructor (UUPS best practice)
+    // ------------------------------------------------------------------
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        // Prevent the implementation contract itself from being initialized.
+        _disableInitializers();
+    }
+
+    // ------------------------------------------------------------------
     // Initializer
     // ------------------------------------------------------------------
     function initialize(

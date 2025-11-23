@@ -86,6 +86,15 @@ contract TradingPost is
     event ListingCancelled(uint256 indexed listingId);
     event ItemSold(uint256 indexed listingId, address indexed buyer, uint256 quantity, uint256 price);
 
+    // ------------------------------------------------------------------
+    // Constructor (UUPS best practice)
+    // ------------------------------------------------------------------
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        // Prevent the implementation contract itself from being initialized.
+        _disableInitializers();
+    }
+
     // ---------------------------------------------------------------------
     // Initializer / Upgradability hooks
     // ---------------------------------------------------------------------

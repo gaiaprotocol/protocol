@@ -62,6 +62,15 @@ contract TopicShares is HoldingRewardsBase {
     event HolderFeeClaimed(address indexed holder, bytes32 indexed topic, uint256 fee);
 
     // ------------------------------------------------------------------
+    // Constructor (UUPS best practice)
+    // ------------------------------------------------------------------
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        // Prevent the implementation contract itself from being initialized.
+        _disableInitializers();
+    }
+
+    // ------------------------------------------------------------------
     // Initializer
     // ------------------------------------------------------------------
     function initialize(
