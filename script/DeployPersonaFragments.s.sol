@@ -9,14 +9,14 @@ import {PersonaFragments} from "../src/social/PersonaFragments.sol";
 
 /// @notice Deploys a UUPS proxy for PersonaFragments using a Ledger signer.
 /// @dev Run with:
-///      forge script script/DeployPersonaFragmentsLedgerScript.s.sol \
+///      forge script script/DeployPersonaFragments.s.sol \
 ///        --rpc-url <RPC_URL> \
 ///        --ledger \
 ///        --sender <LEDGER_ADDRESS> \
 ///        --broadcast \
 ///        --ffi \
 ///        --verify
-contract DeployPersonaFragmentsLedgerScript is Script {
+contract DeployPersonaFragmentsScript is Script {
     // -------------------------------------------------------------------------
     // Deployment configuration
     // -------------------------------------------------------------------------
