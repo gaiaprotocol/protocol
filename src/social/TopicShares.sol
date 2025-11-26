@@ -39,12 +39,6 @@ contract TopicShares is HoldingRewardsBase {
     mapping(bytes32 => mapping(address => Holder)) public holders;
 
     // ------------------------------------------------------------------
-    // Storage Gap
-    // ------------------------------------------------------------------
-    // Reserved space for future upgrades
-    uint256[50] private __gap;
-
-    // ------------------------------------------------------------------
     // Events
     // ------------------------------------------------------------------
     event HolderFeeRateUpdated(uint256 rate);

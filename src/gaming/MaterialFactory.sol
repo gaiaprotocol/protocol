@@ -41,12 +41,6 @@ contract MaterialFactory is OwnableUpgradeable, ReentrancyGuardUpgradeable, UUPS
     mapping(address => bool) public tradingOpened;
 
     // ------------------------------------------------------------------
-    // Storage Gap (Critical for Upgradeability)
-    // ------------------------------------------------------------------
-    // Reserved space to prevent storage collision during future upgrades
-    uint256[50] private __gap;
-
-    // ------------------------------------------------------------------
     // Events
     // ------------------------------------------------------------------
     event ProtocolFeeRecipientUpdated(address indexed protocolFeeRecipient);

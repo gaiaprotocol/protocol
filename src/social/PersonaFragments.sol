@@ -25,12 +25,6 @@ contract PersonaFragments is HoldingRewardsBase {
     mapping(address => uint256) public supply; // persona → total supply
 
     // ------------------------------------------------------------------
-    // Storage Gap
-    // ------------------------------------------------------------------
-    // Reserved space for future upgrades of this specific contract
-    uint256[50] private __gap;
-
-    // ------------------------------------------------------------------
     // Events
     // ------------------------------------------------------------------
     event PersonaOwnerFeeRateUpdated(uint256 rate);

@@ -66,12 +66,6 @@ contract TradingPost is
     mapping(uint256 => Listing) public listings;
 
     // ---------------------------------------------------------------------
-    // Storage Gap (Critical for Upgradeability)
-    // ---------------------------------------------------------------------
-    // Reserved space to prevent storage collision during future upgrades
-    uint256[50] private __gap;
-
-    // ---------------------------------------------------------------------
     // Events
     // ---------------------------------------------------------------------
     event ItemListed(

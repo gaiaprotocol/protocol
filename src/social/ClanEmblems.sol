@@ -45,12 +45,6 @@ contract ClanEmblems is HoldingRewardsBase {
     uint256 private bypassOwnerFullSellGuard;
 
     // ------------------------------------------------------------------
-    // Storage Gap
-    // ------------------------------------------------------------------
-    // Reserved space for future upgrades
-    uint256[50] private __gap;
-
-    // ------------------------------------------------------------------
     // Events
     // ------------------------------------------------------------------
     event ClanFeeRateUpdated(uint256 rate);
