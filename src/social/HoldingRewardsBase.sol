@@ -54,7 +54,9 @@ abstract contract HoldingRewardsBase is OwnableUpgradeable, ReentrancyGuardUpgra
         __ReentrancyGuard_init();
         __UUPSUpgradeable_init();
 
-        if (_protocolFeeRecipient == address(0)) revert InvalidProtocolFeeRecipient();
+        if (_protocolFeeRecipient == address(0)) {
+            revert InvalidProtocolFeeRecipient();
+        }
         if (_holdingVerifier == address(0)) revert InvalidVerifierAddress();
         if (_protocolFeeRate > 1 ether) revert FeeRateExceedsMaximum();
 
@@ -71,7 +73,9 @@ abstract contract HoldingRewardsBase is OwnableUpgradeable, ReentrancyGuardUpgra
     // Admin setters
     // ------------------------------------------------------------------
     function updateProtocolFeeRecipient(address payable _protocolFeeRecipient) external onlyOwner {
-        if (_protocolFeeRecipient == address(0)) revert InvalidProtocolFeeRecipient();
+        if (_protocolFeeRecipient == address(0)) {
+            revert InvalidProtocolFeeRecipient();
+        }
         protocolFeeRecipient = _protocolFeeRecipient;
         emit ProtocolFeeRecipientUpdated(_protocolFeeRecipient);
     }
@@ -96,7 +100,10 @@ abstract contract HoldingRewardsBase is OwnableUpgradeable, ReentrancyGuardUpgra
         uint256 rewardRatio, // The ratio of the fee returned to the user (1 ether = 100%)
         uint256 nonce,
         bytes memory signature
-    ) public returns (uint256) {
+    )
+        public
+        returns (uint256)
+    {
         // 1. Skip logic if signature is empty (Gas optimization)
         if (signature.length == 0) return 0;
 

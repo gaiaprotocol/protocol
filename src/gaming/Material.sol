@@ -40,11 +40,11 @@ contract Material is ERC20Permit, Ownable2Step {
     // ---------------------------------------------------------------------
     // Constructor
     // ---------------------------------------------------------------------
-    constructor(
-        address owner_,
-        string memory name_,
-        string memory symbol_
-    ) ERC20Permit("Material") ERC20("", "") Ownable(owner_) {
+    constructor(address owner_, string memory name_, string memory symbol_)
+        ERC20Permit("Material")
+        ERC20("", "")
+        Ownable(owner_)
+    {
         FACTORY = msg.sender;
         _name = name_;
         _symbol = symbol_;

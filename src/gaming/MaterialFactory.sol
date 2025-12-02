@@ -48,11 +48,7 @@ contract MaterialFactory is OwnableUpgradeable, ReentrancyGuardUpgradeable, UUPS
     event MaterialOwnerFeeRateUpdated(uint256 rate);
 
     event MaterialCreated(
-        address indexed materialOwner,
-        address indexed materialAddress,
-        string name,
-        string symbol,
-        bytes32 metadataHash
+        address indexed materialOwner, address indexed materialAddress, string name, string symbol, bytes32 metadataHash
     );
     event MaterialDeleted(address indexed materialAddress);
     event TradingOpened(address indexed materialAddress);
@@ -90,8 +86,12 @@ contract MaterialFactory is OwnableUpgradeable, ReentrancyGuardUpgradeable, UUPS
         __ReentrancyGuard_init();
         __UUPSUpgradeable_init();
 
-        if (_protocolFeeRecipient == address(0)) revert InvalidProtocolFeeRecipient();
-        if (_protocolFeeRate > 1 ether || _materialOwnerFeeRate > 1 ether) revert FeeRateExceedsMaximum();
+        if (_protocolFeeRecipient == address(0)) {
+            revert InvalidProtocolFeeRecipient();
+        }
+        if (_protocolFeeRate > 1 ether || _materialOwnerFeeRate > 1 ether) {
+            revert FeeRateExceedsMaximum();
+        }
 
         protocolFeeRecipient = _protocolFeeRecipient;
         protocolFeeRate = _protocolFeeRate;
@@ -104,7 +104,13 @@ contract MaterialFactory is OwnableUpgradeable, ReentrancyGuardUpgradeable, UUPS
     }
 
     /// @dev Authorizes implementation upgrades (owner-only).
-    function _authorizeUpgrade(address /*newImplementation*/) internal override onlyOwner {
+    function _authorizeUpgrade(
+        address /*newImplementation*/
+    )
+        internal
+        override
+        onlyOwner
+    {
         // No extra logic — access control enforced by `onlyOwner`.
     }
 
@@ -112,7 +118,9 @@ contract MaterialFactory is OwnableUpgradeable, ReentrancyGuardUpgradeable, UUPS
     // Admin setters
     // ------------------------------------------------------------------
     function updateProtocolFeeRecipient(address payable _protocolFeeRecipient) external onlyOwner {
-        if (_protocolFeeRecipient == address(0)) revert InvalidProtocolFeeRecipient();
+        if (_protocolFeeRecipient == address(0)) {
+            revert InvalidProtocolFeeRecipient();
+        }
         protocolFeeRecipient = _protocolFeeRecipient;
         emit ProtocolFeeRecipientUpdated(_protocolFeeRecipient);
     }
@@ -200,20 +208,21 @@ contract MaterialFactory is OwnableUpgradeable, ReentrancyGuardUpgradeable, UUPS
     // Internal helpers
     // ------------------------------------------------------------------
     function _sendMaterialOwnerFee(address owner, uint256 amount) private {
-        (bool success, ) = payable(owner).call{value: amount}("");
+        (bool success,) = payable(owner).call{value: amount}("");
         if (!success) protocolFeeRecipient.sendValue(amount);
     }
 
-    function executeTrade(
-        address materialAddress,
-        uint256 amount,
-        uint256 price,
-        bool isBuy
-    ) private onlyMaterial(materialAddress) nonReentrant {
+    function executeTrade(address materialAddress, uint256 amount, uint256 price, bool isBuy)
+        private
+        onlyMaterial(materialAddress)
+        nonReentrant
+    {
         Material material = Material(materialAddress);
 
         // Check if trading is allowed (either owner is trading, or trading is opened)
-        if (!(material.owner() == msg.sender || tradingOpened[materialAddress])) revert TradingNotOpenedYet();
+        if (!(material.owner() == msg.sender || tradingOpened[materialAddress])) {
+            revert TradingNotOpenedYet();
+        }
 
         uint256 protocolFee = (price * protocolFeeRate) / 1 ether;
         uint256 materialOwnerFee = (price * materialOwnerFeeRate) / 1 ether;
@@ -228,9 +237,13 @@ contract MaterialFactory is OwnableUpgradeable, ReentrancyGuardUpgradeable, UUPS
             _sendMaterialOwnerFee(material.owner(), materialOwnerFee);
 
             // Refund excess ETH
-            if (msg.value > totalCost) payable(msg.sender).sendValue(msg.value - totalCost);
+            if (msg.value > totalCost) {
+                payable(msg.sender).sendValue(msg.value - totalCost);
+            }
         } else {
-            if (material.balanceOf(msg.sender) < amount) revert InsufficientBalance();
+            if (material.balanceOf(msg.sender) < amount) {
+                revert InsufficientBalance();
+            }
             material.burn(msg.sender, amount);
 
             uint256 netAmount = price - protocolFee - materialOwnerFee;
@@ -241,14 +254,7 @@ contract MaterialFactory is OwnableUpgradeable, ReentrancyGuardUpgradeable, UUPS
         }
 
         emit TradeExecuted(
-            msg.sender,
-            materialAddress,
-            isBuy,
-            amount,
-            price,
-            protocolFee,
-            materialOwnerFee,
-            material.totalSupply()
+            msg.sender, materialAddress, isBuy, amount, price, protocolFee, materialOwnerFee, material.totalSupply()
         );
     }
 

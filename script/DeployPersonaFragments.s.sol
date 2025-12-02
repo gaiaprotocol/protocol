@@ -22,8 +22,7 @@ contract DeployPersonaFragmentsScript is Script {
     // -------------------------------------------------------------------------
 
     /// @notice Address that receives the protocol fee.
-    address payable internal constant PROTOCOL_FEE_RECIPIENT =
-        payable(0x48674148a4043EAadB92E5D8D7C493121D6489b1);
+    address payable internal constant PROTOCOL_FEE_RECIPIENT = payable(0x48674148a4043EAadB92E5D8D7C493121D6489b1);
 
     /// @notice Protocol fee rate (1 ether = 100%, so 0.025 ether = 2.5%).
     uint256 internal constant PROTOCOL_FEE_RATE = 0.025 ether;
@@ -36,8 +35,7 @@ contract DeployPersonaFragmentsScript is Script {
     uint256 internal constant PRICE_INCREMENT_PER_FRAGMENT = 1e15;
 
     /// @notice Off-chain signer that verifies holding rewards.
-    address internal constant HOLDING_VERIFIER =
-        0x22C51C670338459a7bcbe0E0228C3694B3702104;
+    address internal constant HOLDING_VERIFIER = 0x22C51C670338459a7bcbe0E0228C3694B3702104;
 
     /// @notice Artifact name used by OpenZeppelin upgrades tooling.
     string internal constant ARTIFACT = "PersonaFragments.sol";
@@ -85,9 +83,6 @@ contract DeployPersonaFragmentsScript is Script {
         /**
          * 3) Log the deployed proxy address.
          */
-        console.log(
-            "PersonaFragments UUPS proxy deployed via Ledger at:",
-            proxy
-        );
+        console.log("PersonaFragments UUPS proxy deployed via Ledger at:", proxy);
     }
 }

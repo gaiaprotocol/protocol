@@ -4,18 +4,14 @@ pragma solidity ^0.8.30;
 import "forge-std/Test.sol";
 
 // UUPS proxy
-import {
-    ERC1967Proxy
-} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 // Contracts under test
 import {PersonaFragments} from "../src/social/PersonaFragments.sol";
 import {HoldingRewardsBase} from "../src/social/HoldingRewardsBase.sol";
 
 // Signature utilities (used the same way as inside the contract)
-import {
-    MessageHashUtils
-} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
+import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 
 contract PersonaFragmentsTest is Test {
     using MessageHashUtils for bytes32;
@@ -68,22 +64,13 @@ contract PersonaFragmentsTest is Test {
     // ---------------------------------------------------------
     // Helper: Generate a valid signature for holding rewards
     // ---------------------------------------------------------
-    function _signReward(
-        address contractAddr,
-        address user,
-        uint256 rewardRatio,
-        uint256 nonce
-    ) internal view returns (bytes memory sig) {
+    function _signReward(address contractAddr, address user, uint256 rewardRatio, uint256 nonce)
+        internal
+        view
+        returns (bytes memory sig)
+    {
         // Must match HoldingRewardsBase's internal hashing logic
-        bytes32 hash = keccak256(
-            abi.encodePacked(
-                contractAddr,
-                block.chainid,
-                user,
-                rewardRatio,
-                nonce
-            )
-        );
+        bytes32 hash = keccak256(abi.encodePacked(contractAddr, block.chainid, user, rewardRatio, nonce));
         bytes32 ethSigned = hash.toEthSignedMessageHash();
 
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(verifierPk, ethSigned);
@@ -97,10 +84,7 @@ contract PersonaFragmentsTest is Test {
         assertEq(persona.protocolFeeRecipient(), protocolFeeRecipient);
         assertEq(persona.protocolFeeRate(), protocolFeeRate);
         assertEq(persona.personaOwnerFeeRate(), personaOwnerFeeRate);
-        assertEq(
-            persona.priceIncrementPerFragment(),
-            priceIncrementPerFragment
-        );
+        assertEq(persona.priceIncrementPerFragment(), priceIncrementPerFragment);
         assertEq(persona.holdingVerifier(), holdingVerifier);
 
         // OwnableUpgradeable v5 behavior: owner should be this test contract
@@ -165,12 +149,7 @@ contract PersonaFragmentsTest is Test {
         uint256 personaBaseFee = (price * personaOwnerFeeRate) / 1 ether;
 
         uint256 nonce = 0;
-        bytes memory sig = _signReward(
-            address(persona),
-            trader,
-            rewardRatio,
-            nonce
-        );
+        bytes memory sig = _signReward(address(persona), trader, rewardRatio, nonce);
 
         uint256 holdingReward = (rawProtocolFee * rewardRatio) / 1 ether;
         uint256 protocolFee = rawProtocolFee - holdingReward;
@@ -181,13 +160,7 @@ contract PersonaFragmentsTest is Test {
         uint256 beforePersona = personaAddr.balance;
 
         vm.prank(trader);
-        persona.buy{value: totalCost}(
-            personaAddr,
-            amount,
-            rewardRatio,
-            nonce,
-            sig
-        );
+        persona.buy{value: totalCost}(personaAddr, amount, rewardRatio, nonce, sig);
 
         // Fees should reflect reward shifting from protocol to persona
         assertEq(protocolFeeRecipient.balance, beforeProtocol + protocolFee);
@@ -216,24 +189,11 @@ contract PersonaFragmentsTest is Test {
         // Contract expects nonce == 0, we pass 1
         uint256 wrongNonce = 1;
 
-        bytes memory sig = _signReward(
-            address(persona),
-            trader,
-            rewardRatio,
-            wrongNonce
-        );
+        bytes memory sig = _signReward(address(persona), trader, rewardRatio, wrongNonce);
 
         vm.prank(trader);
-        vm.expectRevert(
-            abi.encodeWithSelector(HoldingRewardsBase.InvalidNonce.selector)
-        );
-        persona.buy{value: totalCost}(
-            personaAddr,
-            amount,
-            rewardRatio,
-            wrongNonce,
-            sig
-        );
+        vm.expectRevert(abi.encodeWithSelector(HoldingRewardsBase.InvalidNonce.selector));
+        persona.buy{value: totalCost}(personaAddr, amount, rewardRatio, wrongNonce, sig);
     }
 
     // ---------------------------------------------------------
@@ -250,23 +210,13 @@ contract PersonaFragmentsTest is Test {
 
         // Sign with a different private key
         uint256 otherPk = 0xBEEF;
-        bytes32 hash = keccak256(
-            abi.encodePacked(
-                address(persona),
-                block.chainid,
-                trader,
-                rewardRatio,
-                uint256(0)
-            )
-        );
+        bytes32 hash = keccak256(abi.encodePacked(address(persona), block.chainid, trader, rewardRatio, uint256(0)));
         bytes32 ethSigned = hash.toEthSignedMessageHash();
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(otherPk, ethSigned);
         bytes memory sig = abi.encodePacked(r, s, v);
 
         vm.prank(trader);
-        vm.expectRevert(
-            abi.encodeWithSelector(HoldingRewardsBase.InvalidVerifier.selector)
-        );
+        vm.expectRevert(abi.encodeWithSelector(HoldingRewardsBase.InvalidVerifier.selector));
         persona.buy{value: totalCost}(personaAddr, amount, rewardRatio, 0, sig);
     }
 
@@ -296,16 +246,10 @@ contract PersonaFragmentsTest is Test {
         // Now sell with a reward signature
         uint256 priceSell = persona.getSellPrice(personaAddr, sellAmount);
         uint256 rawProtocolFeeSell = (priceSell * protocolFeeRate) / 1 ether;
-        uint256 personaBaseFeeSell = (priceSell * personaOwnerFeeRate) /
-            1 ether;
+        uint256 personaBaseFeeSell = (priceSell * personaOwnerFeeRate) / 1 ether;
 
         uint256 nonce = 0;
-        bytes memory sig = _signReward(
-            address(persona),
-            trader,
-            rewardRatio,
-            nonce
-        );
+        bytes memory sig = _signReward(address(persona), trader, rewardRatio, nonce);
 
         uint256 holdingReward = (rawProtocolFeeSell * rewardRatio) / 1 ether;
         uint256 protocolFee = rawProtocolFeeSell - holdingReward;

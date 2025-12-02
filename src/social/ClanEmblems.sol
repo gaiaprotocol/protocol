@@ -97,7 +97,13 @@ contract ClanEmblems is HoldingRewardsBase {
     }
 
     /// @dev Authorizes implementation upgrades (owner-only).
-    function _authorizeUpgrade(address /*newImplementation*/) internal override onlyOwner {
+    function _authorizeUpgrade(
+        address /*newImplementation*/
+    )
+        internal
+        override
+        onlyOwner
+    {
         // No extra logic — access control enforced by `onlyOwner`.
     }
 
@@ -171,7 +177,9 @@ contract ClanEmblems is HoldingRewardsBase {
         if (clans[clanId].owner != msg.sender) revert NotClanOwner();
 
         uint256 _supply = supply[clanId];
-        if (balance[clanId][msg.sender] != _supply) revert OwnerMustHoldEntireSupply();
+        if (balance[clanId][msg.sender] != _supply) {
+            revert OwnerMustHoldEntireSupply();
+        }
 
         uint256 price = getSellPrice(clanId, _supply);
 
@@ -248,12 +256,8 @@ contract ClanEmblems is HoldingRewardsBase {
         uint256 rawProtocolFee = (p.price * protocolFeeRate) / 1 ether;
 
         // Updated: baseAmount(rawProtocolFee) is used for calculation but ignored in signature hash
-        uint256 holdingReward = calculateHoldingReward(
-            rawProtocolFee,
-            p.rewardRatio,
-            p.holdingRewardNonce,
-            p.holdingRewardSignature
-        );
+        uint256 holdingReward =
+            calculateHoldingReward(rawProtocolFee, p.rewardRatio, p.holdingRewardNonce, p.holdingRewardSignature);
 
         uint256 protocolFee = rawProtocolFee - holdingReward;
         uint256 clanFee = ((p.price * clanFeeRate) / 1 ether) + holdingReward;
@@ -262,7 +266,9 @@ contract ClanEmblems is HoldingRewardsBase {
             uint256 totalCost = p.price + protocolFee + clanFee;
             if (msg.value < totalCost) revert InsufficientPayment();
 
-            if (balance[p.clanId][msg.sender] == 0) _addUserClan(msg.sender, p.clanId);
+            if (balance[p.clanId][msg.sender] == 0) {
+                _addUserClan(msg.sender, p.clanId);
+            }
 
             balance[p.clanId][msg.sender] += p.amount;
             supply[p.clanId] += p.amount;
@@ -270,21 +276,26 @@ contract ClanEmblems is HoldingRewardsBase {
             protocolFeeRecipient.sendValue(protocolFee);
             clans[p.clanId].accumulatedFees += clanFee;
 
-            if (msg.value > totalCost) payable(msg.sender).sendValue(msg.value - totalCost);
+            if (msg.value > totalCost) {
+                payable(msg.sender).sendValue(msg.value - totalCost);
+            }
         } else {
-            if (balance[p.clanId][msg.sender] < p.amount) revert InsufficientBalance();
+            if (balance[p.clanId][msg.sender] < p.amount) {
+                revert InsufficientBalance();
+            }
 
             // Prevent owner from dumping entire supply except via deleteClan
             if (
-                msg.sender == clans[p.clanId].owner &&
-                balance[p.clanId][msg.sender] == p.amount &&
-                bypassOwnerFullSellGuard == 1
+                msg.sender == clans[p.clanId].owner && balance[p.clanId][msg.sender] == p.amount
+                    && bypassOwnerFullSellGuard == 1
             ) revert OwnerCannotSellAllEmblems();
 
             balance[p.clanId][msg.sender] -= p.amount;
             supply[p.clanId] -= p.amount;
 
-            if (balance[p.clanId][msg.sender] == 0) _removeUserClan(msg.sender, p.clanId);
+            if (balance[p.clanId][msg.sender] == 0) {
+                _removeUserClan(msg.sender, p.clanId);
+            }
 
             payable(msg.sender).sendValue(p.price - protocolFee - clanFee);
             protocolFeeRecipient.sendValue(protocolFee);
@@ -292,15 +303,7 @@ contract ClanEmblems is HoldingRewardsBase {
         }
 
         emit TradeExecuted(
-            msg.sender,
-            p.clanId,
-            p.isBuy,
-            p.amount,
-            p.price,
-            protocolFee,
-            clanFee,
-            holdingReward,
-            supply[p.clanId]
+            msg.sender, p.clanId, p.isBuy, p.amount, p.price, protocolFee, clanFee, holdingReward, supply[p.clanId]
         );
     }
 

@@ -101,7 +101,9 @@ contract TradingPost is
         __ERC1155Holder_init();
         __UUPSUpgradeable_init();
 
-        if (_protocolFeeRecipient == address(0)) revert InvalidProtocolFeeRecipient();
+        if (_protocolFeeRecipient == address(0)) {
+            revert InvalidProtocolFeeRecipient();
+        }
         if (_protocolFeeRate > 1 ether) revert FeeRateExceedsMaximum();
 
         protocolFeeRecipient = _protocolFeeRecipient;
@@ -114,7 +116,13 @@ contract TradingPost is
     }
 
     /// @dev Authorizes implementation upgrades (owner-only).
-    function _authorizeUpgrade(address /*newImplementation*/) internal override onlyOwner {
+    function _authorizeUpgrade(
+        address /*newImplementation*/
+    )
+        internal
+        override
+        onlyOwner
+    {
         // No extra logic — access control enforced by `onlyOwner`.
     }
 
@@ -122,7 +130,9 @@ contract TradingPost is
     // Admin setters
     // ---------------------------------------------------------------------
     function updateProtocolFeeRecipient(address payable _protocolFeeRecipient) external onlyOwner {
-        if (_protocolFeeRecipient == address(0)) revert InvalidProtocolFeeRecipient();
+        if (_protocolFeeRecipient == address(0)) {
+            revert InvalidProtocolFeeRecipient();
+        }
         protocolFeeRecipient = _protocolFeeRecipient;
         emit ProtocolFeeRecipientUpdated(_protocolFeeRecipient);
     }
@@ -136,13 +146,10 @@ contract TradingPost is
     // ---------------------------------------------------------------------
     // Listing logic
     // ---------------------------------------------------------------------
-    function listItem(
-        address nftAddress,
-        uint256 tokenId,
-        TokenType tokenType,
-        uint256 quantity,
-        uint256 price
-    ) external nonReentrant {
+    function listItem(address nftAddress, uint256 tokenId, TokenType tokenType, uint256 quantity, uint256 price)
+        external
+        nonReentrant
+    {
         if (price == 0) revert PriceMustBeGreaterThanZero();
 
         if (tokenType == TokenType.ERC721) {
@@ -177,13 +184,8 @@ contract TradingPost is
         if (listing.tokenType == TokenType.ERC721) {
             IERC721(listing.nftAddress).safeTransferFrom(address(this), listing.seller, listing.tokenId);
         } else if (listing.tokenType == TokenType.ERC1155) {
-            IERC1155(listing.nftAddress).safeTransferFrom(
-                address(this),
-                listing.seller,
-                listing.tokenId,
-                listing.quantity,
-                ""
-            );
+            IERC1155(listing.nftAddress)
+                .safeTransferFrom(address(this), listing.seller, listing.tokenId, listing.quantity, "");
         }
 
         delete listings[listingId];
@@ -199,7 +201,9 @@ contract TradingPost is
             if (quantity != 1) revert InvalidQuantity();
             purchaseQuantity = 1;
         } else if (listing.tokenType == TokenType.ERC1155) {
-            if (quantity == 0 || quantity > listing.quantity) revert InvalidQuantity();
+            if (quantity == 0 || quantity > listing.quantity) {
+                revert InvalidQuantity();
+            }
             purchaseQuantity = quantity;
         } else {
             revert UnsupportedTokenType();
@@ -218,13 +222,8 @@ contract TradingPost is
             IERC721(listing.nftAddress).safeTransferFrom(address(this), msg.sender, listing.tokenId);
             delete listings[listingId];
         } else {
-            IERC1155(listing.nftAddress).safeTransferFrom(
-                address(this),
-                msg.sender,
-                listing.tokenId,
-                purchaseQuantity,
-                ""
-            );
+            IERC1155(listing.nftAddress)
+                .safeTransferFrom(address(this), msg.sender, listing.tokenId, purchaseQuantity, "");
             if (listing.quantity == purchaseQuantity) {
                 delete listings[listingId];
             } else {
@@ -243,9 +242,13 @@ contract TradingPost is
     // ---------------------------------------------------------------------
     // ERC165 support
     // ---------------------------------------------------------------------
-    function supportsInterface(
-        bytes4 interfaceId
-    ) public view virtual override(ERC1155HolderUpgradeable) returns (bool) {
+    function supportsInterface(bytes4 interfaceId)
+        public
+        view
+        virtual
+        override(ERC1155HolderUpgradeable)
+        returns (bool)
+    {
         return super.supportsInterface(interfaceId);
     }
 }

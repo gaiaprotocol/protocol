@@ -86,7 +86,13 @@ contract TopicShares is HoldingRewardsBase {
     }
 
     /// @dev Authorizes implementation upgrades (owner-only).
-    function _authorizeUpgrade(address /*newImplementation*/) internal override onlyOwner {
+    function _authorizeUpgrade(
+        address /*newImplementation*/
+    )
+        internal
+        override
+        onlyOwner
+    {
         // No extra logic — access control enforced by `onlyOwner`.
     }
 
@@ -146,12 +152,8 @@ contract TopicShares is HoldingRewardsBase {
         uint256 rawProtocolFee = (price * protocolFeeRate) / 1 ether;
 
         // Updated: uses base contract logic that ignores price slippage in signature
-        uint256 holdingReward = calculateHoldingReward(
-            rawProtocolFee,
-            rewardRatio,
-            holdingRewardNonce,
-            holdingRewardSignature
-        );
+        uint256 holdingReward =
+            calculateHoldingReward(rawProtocolFee, rewardRatio, holdingRewardNonce, holdingRewardSignature);
 
         uint256 protocolFee = rawProtocolFee - holdingReward;
         uint256 holderFee = ((price * holderFeeRate) / 1 ether) + holdingReward;
@@ -171,7 +173,9 @@ contract TopicShares is HoldingRewardsBase {
         h.feeDebt += int256((amount * t.accFeePerUnit) / ACC_FEE_PRECISION);
 
         protocolFeeRecipient.sendValue(protocolFee);
-        if (msg.value > totalCost) payable(msg.sender).sendValue(msg.value - totalCost);
+        if (msg.value > totalCost) {
+            payable(msg.sender).sendValue(msg.value - totalCost);
+        }
 
         emit TradeExecuted(msg.sender, topic, true, amount, price, protocolFee, holderFee, holdingReward, t.supply);
     }
@@ -198,12 +202,8 @@ contract TopicShares is HoldingRewardsBase {
         uint256 rawProtocolFee = (price * protocolFeeRate) / 1 ether;
 
         // Updated: uses base contract logic that ignores price slippage in signature
-        uint256 holdingReward = calculateHoldingReward(
-            rawProtocolFee,
-            rewardRatio,
-            holdingRewardNonce,
-            holdingRewardSignature
-        );
+        uint256 holdingReward =
+            calculateHoldingReward(rawProtocolFee, rewardRatio, holdingRewardNonce, holdingRewardSignature);
 
         uint256 protocolFee = rawProtocolFee - holdingReward;
         uint256 holderFee = ((price * holderFeeRate) / 1 ether) + holdingReward;
@@ -251,10 +251,11 @@ contract TopicShares is HoldingRewardsBase {
         _claimHolderFee(topic);
     }
 
-    function batchClaimableHolderFees(
-        bytes32[] memory _topics,
-        address holder
-    ) external view returns (uint256[] memory claimableFees) {
+    function batchClaimableHolderFees(bytes32[] memory _topics, address holder)
+        external
+        view
+        returns (uint256[] memory claimableFees)
+    {
         uint256 len = _topics.length;
         claimableFees = new uint256[](len);
         for (uint256 i = 0; i < len; ++i) {
