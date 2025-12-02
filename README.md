@@ -2,6 +2,30 @@
 
 ## Base Mainnet
 
+Deploy
+```sh
+forge script script/DeployPersonaFragments.s.sol \
+  --rpc-url https://mainnet.base.org \
+  --ledger \
+  --sender 0x48674148a4043EAadB92E5D8D7C493121D6489b1 \
+  --broadcast \
+  --ffi \
+  --verify \
+  -vv
+```
+
+Upgrade
+```sh
+forge script script/UpgradePersonaFragments.s.sol \
+  --rpc-url https://mainnet.base.org \
+  --ledger \
+  --sender 0x48674148a4043EAadB92E5D8D7C493121D6489b1 \
+  --broadcast \
+  --ffi \
+  --verify \
+  -vv
+```
+
 ## Base Sepoila
 
 Deploy
