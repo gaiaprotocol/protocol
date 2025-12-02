@@ -54,23 +54,23 @@ forge script script/UpgradePersonaFragments.s.sol \
 
 ```sh
 ##### base-sepolia
-✅  [Success] Hash: 0xb056bb4297e389d53bdb6350a39e816368249c4e7dde72d50789ca1328ae87c3
-Contract Address: 0x5dB776C722Bc38eBD2a7354a7B51dD734C09D9fA
-Block: 34185807
-Paid: 0.0000004328832 ETH (360736 gas * 0.0012 gwei)
+✅  [Success] Hash: 0x7aeff7a4c9af6c7c443379626d1385b7bb6a77cee9890a11c87d5052b6cc4d26
+Contract Address: 0x20b81Afb99CF3A279c7baf4cB54e2fC2b8be4963
+Block: 34447486
+Paid: 0.000005099398114896 ETH (2950303 gas * 0.001728432 gwei)
 
 
 ##### base-sepolia
-✅  [Success] Hash: 0x8f3360614ae8a4b70e898929bd293687d87fb03c7f81dc2229801dafc2979724
-Contract Address: 0x21Be75C9062D2Cba12EaBBdf92d47C4409827c0D
-Block: 34185805
-Paid: 0.0000035227296 ETH (2935608 gas * 0.0012 gwei)
+✅  [Success] Hash: 0xdcb08b5a0df932ea4f9c7f085ae8b89c9860e1924c6dc81d0ebfc77556b701ed
+Contract Address: 0x4720B04934c87388a7b9413413E2378EFF1D117C
+Block: 34447488
+Paid: 0.000000621966942496 ETH (360736 gas * 0.001724161 gwei)
 
-✅ Sequence #1 on base-sepolia | Total Paid: 0.0000039556128 ETH (3296344 gas * avg 0.0012 gwei)
+✅ Sequence #1 on base-sepolia | Total Paid: 0.000005721365057392 ETH (3311039 gas * avg 0.001726296 gwei)
 ```
 
-- PersonaFragments: https://sepolia.basescan.org/address/0x21be75c9062d2cba12eabbdf92d47c4409827c0d
-- ERC1967Proxy: https://sepolia.basescan.org/address/0x5db776c722bc38ebd2a7354a7b51dd734c09d9fa
+- PersonaFragments: https://sepolia.basescan.org/address/0x20b81afb99cf3a279c7baf4cb54e2fc2b8be4963
+- ERC1967Proxy: https://sepolia.basescan.org/address/0x4720b04934c87388a7b9413413e2378eff1d117c
 
 ## License
 

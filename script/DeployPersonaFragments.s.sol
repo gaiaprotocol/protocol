@@ -35,7 +35,7 @@ contract DeployPersonaFragmentsScript is Script {
     uint256 internal constant PRICE_INCREMENT_PER_FRAGMENT = 1e15;
 
     /// @notice Off-chain signer that verifies holding rewards.
-    address internal constant HOLDING_VERIFIER = 0x22C51C670338459a7bcbe0E0228C3694B3702104;
+    address internal constant HOLDING_VERIFIER = 0x67e81DE7802A5f7efEF66b156F2d06a526Bd5BD6;
 
     /// @notice Artifact name used by OpenZeppelin upgrades tooling.
     string internal constant ARTIFACT = "PersonaFragments.sol";
