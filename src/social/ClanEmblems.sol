@@ -52,6 +52,19 @@ contract ClanEmblems is HoldingRewardsBase {
     event ClanDeleted(uint256 indexed clanId);
     event ClanOwnershipTransferred(uint256 indexed clanId, address indexed previousOwner, address indexed newOwner);
     event FeesWithdrawn(uint256 indexed clanId, uint256 amount);
+
+    /**
+     * @param trader          Address performing the trade
+     * @param clanId          Target clan ID
+     * @param isBuy           True if buy, false if sell
+     * @param amount          Amount of emblems bought/sold
+     * @param price           Trade price before fees
+     * @param protocolFee     Final protocol fee after reward deduction
+     * @param clanFee         Fee accumulated for the clan
+     * @param holdingReward   Portion of the protocol fee redirected as reward
+     * @param supply          Clan emblem supply after the trade
+     * @param traderBalance   Trader's emblem balance for this clan after the trade
+     */
     event TradeExecuted(
         address indexed trader,
         uint256 indexed clanId,
@@ -61,7 +74,8 @@ contract ClanEmblems is HoldingRewardsBase {
         uint256 protocolFee,
         uint256 clanFee,
         uint256 holdingReward,
-        uint256 supply
+        uint256 supply,
+        uint256 traderBalance
     );
 
     // ------------------------------------------------------------------
@@ -93,17 +107,12 @@ contract ClanEmblems is HoldingRewardsBase {
 
         emit ClanFeeRateUpdated(_clanFeeRate);
 
+        // Default guard state: owner cannot sell entire supply via normal sell()
         bypassOwnerFullSellGuard = 1;
     }
 
     /// @dev Authorizes implementation upgrades (owner-only).
-    function _authorizeUpgrade(
-        address /*newImplementation*/
-    )
-        internal
-        override
-        onlyOwner
-    {
+    function _authorizeUpgrade(address) internal override onlyOwner {
         // No extra logic — access control enforced by `onlyOwner`.
     }
 
@@ -249,18 +258,18 @@ contract ClanEmblems is HoldingRewardsBase {
     }
 
     function executeTrade(TradeParams memory p) private nonReentrant {
-        // Zero amount check
         if (p.amount == 0) revert ZeroAmount();
         if (clans[p.clanId].owner == address(0)) revert ClanDoesNotExist();
 
         uint256 rawProtocolFee = (p.price * protocolFeeRate) / 1 ether;
 
-        // Updated: baseAmount(rawProtocolFee) is used for calculation but ignored in signature hash
         uint256 holdingReward =
             calculateHoldingReward(rawProtocolFee, p.rewardRatio, p.holdingRewardNonce, p.holdingRewardSignature);
 
         uint256 protocolFee = rawProtocolFee - holdingReward;
         uint256 clanFee = ((p.price * clanFeeRate) / 1 ether) + holdingReward;
+
+        uint256 traderBalanceAfter;
 
         if (p.isBuy) {
             uint256 totalCost = p.price + protocolFee + clanFee;
@@ -302,8 +311,19 @@ contract ClanEmblems is HoldingRewardsBase {
             clans[p.clanId].accumulatedFees += clanFee;
         }
 
+        traderBalanceAfter = balance[p.clanId][msg.sender];
+
         emit TradeExecuted(
-            msg.sender, p.clanId, p.isBuy, p.amount, p.price, protocolFee, clanFee, holdingReward, supply[p.clanId]
+            msg.sender,
+            p.clanId,
+            p.isBuy,
+            p.amount,
+            p.price,
+            protocolFee,
+            clanFee,
+            holdingReward,
+            supply[p.clanId],
+            traderBalanceAfter
         );
     }
 

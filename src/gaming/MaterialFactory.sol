@@ -53,6 +53,17 @@ contract MaterialFactory is OwnableUpgradeable, ReentrancyGuardUpgradeable, UUPS
     event MaterialDeleted(address indexed materialAddress);
     event TradingOpened(address indexed materialAddress);
 
+    /**
+     * @param trader          Address performing the trade
+     * @param materialAddress Address of the Material token
+     * @param isBuy           True if buy, false if sell
+     * @param amount          Amount of tokens traded
+     * @param price           Trade price before fees
+     * @param protocolFee     Protocol fee amount
+     * @param materialOwnerFee Fee paid to the material owner
+     * @param supply          Total supply of the material after the trade
+     * @param traderBalance   Trader's token balance after the trade
+     */
     event TradeExecuted(
         address indexed trader,
         address indexed materialAddress,
@@ -61,7 +72,8 @@ contract MaterialFactory is OwnableUpgradeable, ReentrancyGuardUpgradeable, UUPS
         uint256 price,
         uint256 protocolFee,
         uint256 materialOwnerFee,
-        uint256 supply
+        uint256 supply,
+        uint256 traderBalance
     );
 
     // ------------------------------------------------------------------
@@ -104,13 +116,7 @@ contract MaterialFactory is OwnableUpgradeable, ReentrancyGuardUpgradeable, UUPS
     }
 
     /// @dev Authorizes implementation upgrades (owner-only).
-    function _authorizeUpgrade(
-        address /*newImplementation*/
-    )
-        internal
-        override
-        onlyOwner
-    {
+    function _authorizeUpgrade(address) internal override onlyOwner {
         // No extra logic — access control enforced by `onlyOwner`.
     }
 
@@ -141,10 +147,9 @@ contract MaterialFactory is OwnableUpgradeable, ReentrancyGuardUpgradeable, UUPS
     // Material lifecycle
     // ------------------------------------------------------------------
     function createMaterial(string memory name, string memory symbol, bytes32 metadataHash) public returns (address) {
-        // NOTE: Ensure the Material constructor properly sets up permissions
-        // so this Factory contract can mint/burn if needed.
         Material newMaterial = new Material(msg.sender, name, symbol);
         isMaterial[address(newMaterial)] = true;
+
         emit MaterialCreated(msg.sender, address(newMaterial), name, symbol, metadataHash);
         return address(newMaterial);
     }
@@ -170,6 +175,7 @@ contract MaterialFactory is OwnableUpgradeable, ReentrancyGuardUpgradeable, UUPS
 
         material.deleteMaterial();
         delete tradingOpened[materialAddress];
+
         emit MaterialDeleted(materialAddress);
     }
 
@@ -209,7 +215,9 @@ contract MaterialFactory is OwnableUpgradeable, ReentrancyGuardUpgradeable, UUPS
     // ------------------------------------------------------------------
     function _sendMaterialOwnerFee(address owner, uint256 amount) private {
         (bool success,) = payable(owner).call{value: amount}("");
-        if (!success) protocolFeeRecipient.sendValue(amount);
+        if (!success) {
+            protocolFeeRecipient.sendValue(amount);
+        }
     }
 
     function executeTrade(address materialAddress, uint256 amount, uint256 price, bool isBuy)
@@ -217,6 +225,8 @@ contract MaterialFactory is OwnableUpgradeable, ReentrancyGuardUpgradeable, UUPS
         onlyMaterial(materialAddress)
         nonReentrant
     {
+        if (amount == 0) revert InvalidAmount();
+
         Material material = Material(materialAddress);
 
         // Check if trading is allowed (either owner is trading, or trading is opened)
@@ -226,17 +236,18 @@ contract MaterialFactory is OwnableUpgradeable, ReentrancyGuardUpgradeable, UUPS
 
         uint256 protocolFee = (price * protocolFeeRate) / 1 ether;
         uint256 materialOwnerFee = (price * materialOwnerFeeRate) / 1 ether;
+        uint256 traderBalanceAfter;
 
         if (isBuy) {
             uint256 totalCost = price + protocolFee + materialOwnerFee;
-            // Slippage protection check
             if (msg.value < totalCost) revert InsufficientPayment();
 
             material.mint(msg.sender, amount);
+            traderBalanceAfter = material.balanceOf(msg.sender);
+
             protocolFeeRecipient.sendValue(protocolFee);
             _sendMaterialOwnerFee(material.owner(), materialOwnerFee);
 
-            // Refund excess ETH
             if (msg.value > totalCost) {
                 payable(msg.sender).sendValue(msg.value - totalCost);
             }
@@ -244,7 +255,9 @@ contract MaterialFactory is OwnableUpgradeable, ReentrancyGuardUpgradeable, UUPS
             if (material.balanceOf(msg.sender) < amount) {
                 revert InsufficientBalance();
             }
+
             material.burn(msg.sender, amount);
+            traderBalanceAfter = material.balanceOf(msg.sender);
 
             uint256 netAmount = price - protocolFee - materialOwnerFee;
 
@@ -254,7 +267,15 @@ contract MaterialFactory is OwnableUpgradeable, ReentrancyGuardUpgradeable, UUPS
         }
 
         emit TradeExecuted(
-            msg.sender, materialAddress, isBuy, amount, price, protocolFee, materialOwnerFee, material.totalSupply()
+            msg.sender,
+            materialAddress,
+            isBuy,
+            amount,
+            price,
+            protocolFee,
+            materialOwnerFee,
+            material.totalSupply(),
+            traderBalanceAfter
         );
     }
 

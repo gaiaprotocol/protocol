@@ -42,6 +42,19 @@ contract TopicShares is HoldingRewardsBase {
     // Events
     // ------------------------------------------------------------------
     event HolderFeeRateUpdated(uint256 rate);
+
+    /**
+     * @param trader          Address performing the trade
+     * @param topic           Topic identifier
+     * @param isBuy           True if buy, false if sell
+     * @param amount          Amount of shares traded
+     * @param price           Trade price before fees
+     * @param protocolFee     Final protocol fee after reward deduction
+     * @param holderFee       Fee redistributed to topic holders + holding reward
+     * @param holdingReward   Portion of the protocol fee redirected as reward
+     * @param supply          Topic supply after the trade
+     * @param traderBalance   Trader's share balance for this topic after the trade
+     */
     event TradeExecuted(
         address indexed trader,
         bytes32 indexed topic,
@@ -51,8 +64,10 @@ contract TopicShares is HoldingRewardsBase {
         uint256 protocolFee,
         uint256 holderFee,
         uint256 holdingReward,
-        uint256 supply
+        uint256 supply,
+        uint256 traderBalance
     );
+
     event HolderFeeClaimed(address indexed holder, bytes32 indexed topic, uint256 fee);
 
     // ------------------------------------------------------------------
@@ -86,13 +101,7 @@ contract TopicShares is HoldingRewardsBase {
     }
 
     /// @dev Authorizes implementation upgrades (owner-only).
-    function _authorizeUpgrade(
-        address /*newImplementation*/
-    )
-        internal
-        override
-        onlyOwner
-    {
+    function _authorizeUpgrade(address) internal override onlyOwner {
         // No extra logic — access control enforced by `onlyOwner`.
     }
 
@@ -151,7 +160,6 @@ contract TopicShares is HoldingRewardsBase {
 
         uint256 rawProtocolFee = (price * protocolFeeRate) / 1 ether;
 
-        // Updated: uses base contract logic that ignores price slippage in signature
         uint256 holdingReward =
             calculateHoldingReward(rawProtocolFee, rewardRatio, holdingRewardNonce, holdingRewardSignature);
 
@@ -172,12 +180,16 @@ contract TopicShares is HoldingRewardsBase {
         h.balance += amount;
         h.feeDebt += int256((amount * t.accFeePerUnit) / ACC_FEE_PRECISION);
 
+        uint256 traderBalanceAfter = h.balance;
+
         protocolFeeRecipient.sendValue(protocolFee);
         if (msg.value > totalCost) {
             payable(msg.sender).sendValue(msg.value - totalCost);
         }
 
-        emit TradeExecuted(msg.sender, topic, true, amount, price, protocolFee, holderFee, holdingReward, t.supply);
+        emit TradeExecuted(
+            msg.sender, topic, true, amount, price, protocolFee, holderFee, holdingReward, t.supply, traderBalanceAfter
+        );
     }
 
     // ------------------------------------------------------------------
@@ -201,7 +213,6 @@ contract TopicShares is HoldingRewardsBase {
 
         uint256 rawProtocolFee = (price * protocolFeeRate) / 1 ether;
 
-        // Updated: uses base contract logic that ignores price slippage in signature
         uint256 holdingReward =
             calculateHoldingReward(rawProtocolFee, rewardRatio, holdingRewardNonce, holdingRewardSignature);
 
@@ -212,19 +223,25 @@ contract TopicShares is HoldingRewardsBase {
         holder.feeDebt -= int256((amount * t.accFeePerUnit) / ACC_FEE_PRECISION);
         t.supply -= amount;
 
+        uint256 traderBalanceAfter = holder.balance;
+
         if (t.supply > 0) {
             t.accFeePerUnit += (holderFee * ACC_FEE_PRECISION) / t.supply;
             topics[topic] = t;
+
             payable(msg.sender).sendValue(price - protocolFee - holderFee);
             protocolFeeRecipient.sendValue(protocolFee);
         } else {
             // Last seller case: No remaining holders, so fees go to protocol
             topics[topic] = t;
+
             payable(msg.sender).sendValue(price - protocolFee - holderFee);
             protocolFeeRecipient.sendValue(protocolFee + holderFee);
         }
 
-        emit TradeExecuted(msg.sender, topic, false, amount, price, protocolFee, holderFee, holdingReward, t.supply);
+        emit TradeExecuted(
+            msg.sender, topic, false, amount, price, protocolFee, holderFee, holdingReward, t.supply, traderBalanceAfter
+        );
     }
 
     // ------------------------------------------------------------------
@@ -243,6 +260,7 @@ contract TopicShares is HoldingRewardsBase {
         int256 accumulatedFee = int256((holder.balance * t.accFeePerUnit) / ACC_FEE_PRECISION);
         uint256 claimableFee = uint256(accumulatedFee - holder.feeDebt);
         holder.feeDebt = accumulatedFee;
+
         payable(msg.sender).sendValue(claimableFee);
         emit HolderFeeClaimed(msg.sender, topic, claimableFee);
     }
