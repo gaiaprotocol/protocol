@@ -4,7 +4,7 @@
 
 Deploy
 ```sh
-forge script script/DeployPersonaFragments.s.sol \
+forge clean && forge script script/DeployPersonaFragments.s.sol \
   --rpc-url https://mainnet.base.org \
   --ledger \
   --sender 0x48674148a4043EAadB92E5D8D7C493121D6489b1 \
@@ -16,7 +16,7 @@ forge script script/DeployPersonaFragments.s.sol \
 
 Upgrade
 ```sh
-forge script script/UpgradePersonaFragments.s.sol \
+forge clean && forge script script/UpgradePersonaFragments.s.sol \
   --rpc-url https://mainnet.base.org \
   --ledger \
   --sender 0x48674148a4043EAadB92E5D8D7C493121D6489b1 \
@@ -30,7 +30,7 @@ forge script script/UpgradePersonaFragments.s.sol \
 
 Deploy
 ```sh
-forge script script/DeployPersonaFragments.s.sol \
+forge clean && forge script script/DeployPersonaFragments.s.sol \
   --rpc-url https://sepolia.base.org \
   --ledger \
   --sender 0x48674148a4043EAadB92E5D8D7C493121D6489b1 \
@@ -42,7 +42,7 @@ forge script script/DeployPersonaFragments.s.sol \
 
 Upgrade
 ```sh
-forge script script/UpgradePersonaFragments.s.sol \
+forge clean && forge script script/UpgradePersonaFragments.s.sol \
   --rpc-url https://sepolia.base.org \
   --ledger \
   --sender 0x48674148a4043EAadB92E5D8D7C493121D6489b1 \
