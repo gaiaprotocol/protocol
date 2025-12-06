@@ -26,6 +26,26 @@ forge clean && forge script script/UpgradePersonaFragments.s.sol \
   -vv
 ```
 
+```sh
+##### base
+✅  [Success] Hash: 0x8ed8531ee17d439db6b5b40f62860bae513ccd55779a9ae2c432a3d197f36064
+Contract Address: 0x5dD8E5540e6de39BB1950259dD5dDA7e0F787744
+Block: 39101052
+Paid: 0.0000008850909 ETH (2950303 gas * 0.0003 gwei)
+
+
+##### base
+✅  [Success] Hash: 0xe20c804cd04b58e3ae2f72f8b0eb92abf610f49fc1b50bd1f95fee01fe85a3ef
+Contract Address: 0xE59557cC3F9524Fa062120a02e467E1B07272688
+Block: 39101055
+Paid: 0.00000010826515828 ETH (360760 gas * 0.000300103 gwei)
+
+✅ Sequence #1 on base | Total Paid: 0.00000099335605828 ETH (3311063 gas * avg 0.000300051 gwei)
+```
+
+- PersonaFragments: https://basescan.org/address/0x5dd8e5540e6de39bb1950259dd5dda7e0f787744
+- ERC1967Proxy: https://basescan.org/address/0xe59557cc3f9524fa062120a02e467e1b07272688
+
 ## Base Sepoila
 
 Deploy
