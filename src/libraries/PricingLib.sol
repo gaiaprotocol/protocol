@@ -7,9 +7,9 @@ library PricingLib {
         pure
         returns (uint256)
     {
-        uint256 startPrice = priceIncrement + (supply * priceIncrement) / scaleFactor;
+        uint256 startPrice = (supply * priceIncrement) / scaleFactor;
         uint256 endSupply = supply + amount;
-        uint256 endPrice = priceIncrement + (endSupply * priceIncrement) / scaleFactor;
+        uint256 endPrice = (endSupply * priceIncrement) / scaleFactor;
 
         uint256 averagePrice = (startPrice + endPrice) / 2;
         return (averagePrice * amount) / scaleFactor;
