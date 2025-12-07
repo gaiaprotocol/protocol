@@ -77,7 +77,7 @@ contract PricingLibTest is Test {
     }
 
     /// -----------------------------------------------------------------------
-    /// Tests
+    /// Core Behavior Tests
     /// -----------------------------------------------------------------------
 
     /// @notice supply=0, amount=1 whole token -> price = 0.001 ETH
@@ -232,6 +232,10 @@ contract PricingLibTest is Test {
         assertGt(priceSecond, priceFirst, "second 0.5 token price must be higher due to increased supply");
     }
 
+    /// -----------------------------------------------------------------------
+    /// Large Number Stress Tests
+    /// -----------------------------------------------------------------------
+
     /// @notice Very large supply and large trade amount should not overflow and must return a positive price.
     function testPrice_LargeSupplyAndLargeAmount() public {
         uint256 supplyTokens = 1_000_000_000; // 1 billion tokens
@@ -279,5 +283,47 @@ contract PricingLibTest is Test {
         assertGt(buyPrice, 0, "buy price must be > 0");
         assertEq(buyPrice, sellPrice, "total buy and total sell must match at large scale");
         assertEq(avgBuyPerToken, avgSellPerToken, "avg buy/sell per token must match at large scale");
+    }
+
+    /// @notice Extreme supply (1e18 tokens) with smaller priceIncrement to avoid overflow.
+    function testPrice_ExtremeSupplyWithSmallerIncrement() public {
+        uint256 supplyTokens = 1e18; // 1e18 tokens
+        uint256 amountTokens = 1_000_000_000; // 1 billion tokens traded
+
+        uint256 supply = supplyTokens * UNITS_18; // 1e36 in raw units
+        uint256 amount = amountTokens * UNITS_18; // 1e27 in raw units
+        uint256 smallIncrement = 1e5; // much smaller than 1e15 to stay in safe range
+
+        uint256 price = PricingLib.getPrice(supply, amount, smallIncrement, UNITS_18);
+
+        console.log("=== ExtremeSupplyWithSmallerIncrement ===");
+        console.log("Supply (tokens):   ", formatTokenAmount(supply, UNITS_18));
+        console.log("Amount (tokens):   ", formatTokenAmount(amount, UNITS_18));
+        console.log("priceIncrement:    ", formatETH(smallIncrement));
+        console.log("Price:             ", formatETH(price));
+        console.log("");
+
+        assertGt(price, 0, "price must be > 0 for extreme supply with smaller increment");
+    }
+
+    /// @notice Extreme priceIncrement with moderate supply, still without overflow.
+    function testPrice_ExtremePriceIncrementWithModerateSupply() public {
+        uint256 supplyTokens = 1_000_000; // 1e6 tokens
+        uint256 amountTokens = 100_000; // 1e5 tokens
+
+        uint256 supply = supplyTokens * UNITS_18; // 1e24
+        uint256 amount = amountTokens * UNITS_18; // 1e23
+        uint256 hugeIncrement = 1e24; // crazy large priceIncrement, but still safe with this supply
+
+        uint256 price = PricingLib.getPrice(supply, amount, hugeIncrement, UNITS_18);
+
+        console.log("=== ExtremePriceIncrementWithModerateSupply ===");
+        console.log("Supply (tokens):   ", formatTokenAmount(supply, UNITS_18));
+        console.log("Amount (tokens):   ", formatTokenAmount(amount, UNITS_18));
+        console.log("priceIncrement:    ", formatETH(hugeIncrement));
+        console.log("Price:             ", formatETH(price));
+        console.log("");
+
+        assertGt(price, 0, "price must be > 0 for huge increment with moderate supply");
     }
 }
