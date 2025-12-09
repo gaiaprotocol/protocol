@@ -24,7 +24,8 @@ contract MaterialFactory is OwnableUpgradeable, ReentrancyGuardUpgradeable, UUPS
     error SupplyNotZero();
     error InsufficientPayment();
     error InsufficientBalance();
-    error InvalidAmount();
+    error ZeroAmount();
+    error ZeroPrice();
 
     // ------------------------------------------------------------------
     // Configuration
@@ -225,7 +226,8 @@ contract MaterialFactory is OwnableUpgradeable, ReentrancyGuardUpgradeable, UUPS
         onlyMaterial(materialAddress)
         nonReentrant
     {
-        if (amount == 0) revert InvalidAmount();
+        if (amount == 0) revert ZeroAmount();
+        if (price == 0) revert ZeroPrice();
 
         Material material = Material(materialAddress);
 
@@ -283,15 +285,11 @@ contract MaterialFactory is OwnableUpgradeable, ReentrancyGuardUpgradeable, UUPS
     // External trading API
     // ------------------------------------------------------------------
     function buy(address materialAddress, uint256 amount) external payable {
-        if (amount == 0) revert InvalidAmount();
-
         uint256 price = getBuyPrice(materialAddress, amount);
         executeTrade(materialAddress, amount, price, true);
     }
 
     function sell(address materialAddress, uint256 amount) external {
-        if (amount == 0) revert InvalidAmount();
-
         uint256 price = getSellPrice(materialAddress, amount);
         executeTrade(materialAddress, amount, price, false);
     }

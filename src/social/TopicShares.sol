@@ -20,7 +20,8 @@ contract TopicShares is HoldingRewardsBase {
     // ------------------------------------------------------------------
     error InsufficientPayment();
     error InsufficientBalance();
-    error InvalidAmount();
+    error ZeroAmount();
+    error ZeroPrice();
 
     // ------------------------------------------------------------------
     // Data structures
@@ -153,10 +154,11 @@ contract TopicShares is HoldingRewardsBase {
         uint256 holdingRewardNonce,
         bytes memory holdingRewardSignature
     ) external payable nonReentrant {
-        if (amount == 0) revert InvalidAmount(); // Prevent zero trades
+        if (amount == 0) revert ZeroAmount(); // Prevent zero trades
 
         Topic memory t = topics[topic];
         uint256 price = getBuyPrice(topic, amount);
+        if (price == 0) revert ZeroPrice();
 
         uint256 rawProtocolFee = (price * protocolFeeRate) / 1 ether;
 
@@ -202,7 +204,7 @@ contract TopicShares is HoldingRewardsBase {
         uint256 holdingRewardNonce,
         bytes memory holdingRewardSignature
     ) external nonReentrant {
-        if (amount == 0) revert InvalidAmount(); // Prevent zero trades
+        if (amount == 0) revert ZeroAmount(); // Prevent zero trades
 
         Topic memory t = topics[topic];
         Holder storage holder = holders[topic][msg.sender];
@@ -210,6 +212,7 @@ contract TopicShares is HoldingRewardsBase {
         if (holder.balance < amount) revert InsufficientBalance();
 
         uint256 price = getSellPrice(topic, amount);
+        if (price == 0) revert ZeroPrice();
 
         uint256 rawProtocolFee = (price * protocolFeeRate) / 1 ether;
 

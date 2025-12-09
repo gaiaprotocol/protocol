@@ -13,7 +13,8 @@ contract PersonaFragments is HoldingRewardsBase {
     // ------------------------------------------------------------------
     error InsufficientPayment();
     error InsufficientBalance();
-    error InvalidAmount();
+    error ZeroAmount();
+    error ZeroPrice();
 
     // ------------------------------------------------------------------
     // Storage
@@ -154,6 +155,9 @@ contract PersonaFragments is HoldingRewardsBase {
     // Trade Execution
     // ------------------------------------------------------------------
     function executeTrade(TradeParams memory p) private nonReentrant {
+        if (p.amount == 0) revert ZeroAmount();
+        if (p.price == 0) revert ZeroPrice();
+
         uint256 rawProtocolFee = (p.price * protocolFeeRate) / 1 ether;
 
         // holdingReward is deducted from protocol fee and moved into personaFee
@@ -219,8 +223,6 @@ contract PersonaFragments is HoldingRewardsBase {
         uint256 holdingRewardNonce,
         bytes memory holdingRewardSignature
     ) external payable {
-        if (amount == 0) revert InvalidAmount();
-
         uint256 price = getBuyPrice(persona, amount);
         executeTrade(
             TradeParams({
@@ -242,8 +244,6 @@ contract PersonaFragments is HoldingRewardsBase {
         uint256 holdingRewardNonce,
         bytes memory holdingRewardSignature
     ) external {
-        if (amount == 0) revert InvalidAmount();
-
         uint256 price = getSellPrice(persona, amount);
         executeTrade(
             TradeParams({
