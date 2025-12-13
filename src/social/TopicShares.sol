@@ -161,18 +161,26 @@ contract TopicShares is HoldingRewardsBase {
         if (price == 0) revert ZeroPrice();
 
         uint256 rawProtocolFee = (price * protocolFeeRate) / 1 ether;
+        uint256 rawHolderFee = (price * holderFeeRate) / 1 ether;
 
-        uint256 holdingReward =
-            calculateHoldingReward(rawProtocolFee, rewardRatio, holdingRewardNonce, holdingRewardSignature);
-
-        uint256 protocolFee = rawProtocolFee - holdingReward;
-        uint256 holderFee = ((price * holderFeeRate) / 1 ether) + holdingReward;
-
-        uint256 totalCost = price + protocolFee + holderFee;
+        uint256 totalCost = price + rawProtocolFee + rawHolderFee;
         if (msg.value < totalCost) revert InsufficientPayment();
 
+        uint256 protocolFee;
+        uint256 holderFee;
+        uint256 holdingReward;
+
         if (t.supply > 0) {
+            // Updated: uses base contract logic that ignores price slippage in signature
+            holdingReward =
+                calculateHoldingReward(rawProtocolFee, rewardRatio, holdingRewardNonce, holdingRewardSignature);
+
+            protocolFee = rawProtocolFee - holdingReward;
+            holderFee = rawHolderFee + holdingReward;
             t.accFeePerUnit += (holderFee * ACC_FEE_PRECISION) / t.supply;
+        } else {
+            // First buyer case: No holding rewards possible
+            protocolFee = rawProtocolFee + rawHolderFee;
         }
 
         t.supply += amount;
@@ -215,12 +223,12 @@ contract TopicShares is HoldingRewardsBase {
         if (price == 0) revert ZeroPrice();
 
         uint256 rawProtocolFee = (price * protocolFeeRate) / 1 ether;
+        uint256 rawHolderFee = (price * holderFeeRate) / 1 ether;
+        uint256 totalFee = rawProtocolFee + rawHolderFee;
 
-        uint256 holdingReward =
-            calculateHoldingReward(rawProtocolFee, rewardRatio, holdingRewardNonce, holdingRewardSignature);
-
-        uint256 protocolFee = rawProtocolFee - holdingReward;
-        uint256 holderFee = ((price * holderFeeRate) / 1 ether) + holdingReward;
+        uint256 protocolFee;
+        uint256 holderFee;
+        uint256 holdingReward;
 
         holder.balance -= amount;
         holder.feeDebt -= int256((amount * t.accFeePerUnit) / ACC_FEE_PRECISION);
@@ -229,18 +237,22 @@ contract TopicShares is HoldingRewardsBase {
         uint256 traderBalanceAfter = holder.balance;
 
         if (t.supply > 0) {
-            t.accFeePerUnit += (holderFee * ACC_FEE_PRECISION) / t.supply;
-            topics[topic] = t;
+            holdingReward =
+                calculateHoldingReward(rawProtocolFee, rewardRatio, holdingRewardNonce, holdingRewardSignature);
 
-            payable(msg.sender).sendValue(price - protocolFee - holderFee);
-            protocolFeeRecipient.sendValue(protocolFee);
+            protocolFee = rawProtocolFee - holdingReward;
+            holderFee = rawHolderFee + holdingReward;
+
+            t.accFeePerUnit += (holderFee * ACC_FEE_PRECISION) / t.supply;
         } else {
             // Last seller case: No remaining holders, so fees go to protocol
-            topics[topic] = t;
-
-            payable(msg.sender).sendValue(price - protocolFee - holderFee);
-            protocolFeeRecipient.sendValue(protocolFee + holderFee);
+            protocolFee = totalFee;
         }
+
+        topics[topic] = t;
+
+        protocolFeeRecipient.sendValue(protocolFee);
+        payable(msg.sender).sendValue(price - totalFee);
 
         emit TradeExecuted(
             msg.sender, topic, false, amount, price, protocolFee, holderFee, holdingReward, t.supply, traderBalanceAfter
